@@ -1,0 +1,14 @@
+**/node_modules
+**/vendor
+**/.git
+**/dist
+backend/storage/logs/*
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/.env
+backend/.env.production
+.env
+.env.production
+frontend/dist
+.claude
