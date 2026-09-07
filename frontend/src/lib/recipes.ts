@@ -1,5 +1,31 @@
 import { api } from '@/lib/api'
 
+export type RecipeCategory =
+  | 'appetizer'
+  | 'main_course'
+  | 'side_dish'
+  | 'dessert'
+  | 'snack'
+  | 'drink'
+
+export const RECIPE_CATEGORIES: RecipeCategory[] = [
+  'appetizer',
+  'main_course',
+  'side_dish',
+  'dessert',
+  'snack',
+  'drink',
+]
+
+export const RECIPE_CATEGORY_LABELS: Record<RecipeCategory, string> = {
+  appetizer: 'Vorspeise',
+  main_course: 'Hauptspeise',
+  side_dish: 'Beilage',
+  dessert: 'Dessert',
+  snack: 'Snack',
+  drink: 'Getränk',
+}
+
 export interface RecipeIngredient {
   id: number
   name: string
@@ -12,6 +38,7 @@ export interface Recipe {
   id: number
   title: string
   cuisine: string | null
+  category: RecipeCategory | null
   description: string | null
   servings: number
   prep_time_minutes: number | null
@@ -29,6 +56,7 @@ export interface Recipe {
 
 export interface RecipeFilters {
   cuisine?: string
+  category?: RecipeCategory
   search?: string
   min_calories?: number
   max_calories?: number
@@ -72,6 +100,7 @@ export interface UpdateRecipeIngredient {
 export interface UpdateRecipePayload {
   title?: string
   cuisine?: string | null
+  category?: RecipeCategory | null
   description?: string | null
   instructions?: string[]
   servings?: number

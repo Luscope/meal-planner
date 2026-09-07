@@ -25,6 +25,24 @@ test('updates scalar recipe fields', function () {
     expect($recipe->fresh()->title)->toBe('Neuer Titel');
 });
 
+test('updates the recipe category', function () {
+    [$household] = actingAsHouseholdUser();
+    $recipe = Recipe::factory()->for($household)->create(['category' => 'main_course']);
+
+    $response = $this->patchJson("/api/recipes/{$recipe->id}", ['category' => 'dessert']);
+
+    $response->assertOk()->assertJsonPath('data.category', 'dessert');
+    expect($recipe->fresh()->category)->toBe(App\Enums\RecipeCategory::Dessert);
+});
+
+test('rejects an invalid category value on update', function () {
+    [$household] = actingAsHouseholdUser();
+    $recipe = Recipe::factory()->for($household)->create();
+
+    $this->patchJson("/api/recipes/{$recipe->id}", ['category' => 'not-a-real-category'])
+        ->assertStatus(422);
+});
+
 test('replaces the ingredient list when ingredients are provided', function () {
     [$household] = actingAsHouseholdUser();
     $recipe = Recipe::factory()->for($household)->create();

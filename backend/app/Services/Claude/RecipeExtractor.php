@@ -3,6 +3,7 @@
 namespace App\Services\Claude;
 
 use Anthropic\Client;
+use App\Enums\RecipeCategory;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -119,6 +120,11 @@ class RecipeExtractor
             'properties' => [
                 'title' => ['type' => 'string', 'minLength' => 1],
                 'cuisine' => ['type' => ['string', 'null'], 'description' => 'e.g. vietnamesisch, japanisch, thailändisch, italienisch, deutsch'],
+                'category' => [
+                    'type' => 'string',
+                    'enum' => array_column(RecipeCategory::cases(), 'value'),
+                    'description' => 'The best-fitting course/category for this dish: appetizer (Vorspeise), main_course (Hauptspeise), side_dish (Beilage), dessert (Dessert), snack (Snack), or drink (Getränk). Pick the single best match even if not stated explicitly by the source.',
+                ],
                 'description' => ['type' => ['string', 'null']],
                 'servings' => ['type' => 'integer'],
                 'prep_time_minutes' => ['type' => ['integer', 'null']],
@@ -149,7 +155,7 @@ class RecipeExtractor
                     'minItems' => 1,
                 ],
             ],
-            'required' => ['title', 'servings', 'instructions', 'ingredients'],
+            'required' => ['title', 'category', 'servings', 'instructions', 'ingredients'],
             'additionalProperties' => false,
         ];
     }

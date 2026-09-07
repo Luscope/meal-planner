@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { extractErrorMessage } from '@/lib/api'
-import { fetchRecipe, type Recipe } from '@/lib/recipes'
+import { fetchRecipe, RECIPE_CATEGORY_LABELS, type Recipe } from '@/lib/recipes'
 
 const route = useRoute()
 const recipe = ref<Recipe | null>(null)
@@ -40,7 +40,10 @@ onMounted(async () => {
 
     <template v-if="recipe">
       <h1>{{ recipe.title }}</h1>
-      <p v-if="recipe.cuisine" class="cuisine-badge">{{ recipe.cuisine }}</p>
+      <div class="badges">
+        <p v-if="recipe.cuisine" class="cuisine-badge">{{ recipe.cuisine }}</p>
+        <p v-if="recipe.category" class="category-badge">{{ RECIPE_CATEGORY_LABELS[recipe.category] }}</p>
+      </div>
       <p v-if="recipe.description" class="description">{{ recipe.description }}</p>
 
       <dl class="meta-grid">
@@ -141,13 +144,31 @@ onMounted(async () => {
   opacity: 0.7;
 }
 
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 1rem;
+}
+
 .cuisine-badge {
   display: inline-block;
   font-size: 0.8rem;
   background: var(--color-background-soft);
   border-radius: 999px;
   padding: 0.2rem 0.7rem;
-  margin: 0 0 1rem;
+  margin: 0;
+}
+
+.category-badge {
+  display: inline-block;
+  font-size: 0.8rem;
+  background: var(--color-accent-soft, var(--color-background-soft));
+  color: var(--color-accent, inherit);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  margin: 0;
 }
 
 .description {

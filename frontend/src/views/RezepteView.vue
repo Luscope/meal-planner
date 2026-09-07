@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { extractErrorMessage } from '@/lib/api'
-import { fetchCuisines, fetchRecipes, type PaginatedRecipes, type Recipe } from '@/lib/recipes'
+import {
+  fetchCuisines,
+  fetchRecipes,
+  RECIPE_CATEGORIES,
+  RECIPE_CATEGORY_LABELS,
+  type PaginatedRecipes,
+  type Recipe,
+  type RecipeCategory,
+} from '@/lib/recipes'
 
 const recipes = ref<Recipe[]>([])
 const meta = ref<PaginatedRecipes['meta'] | null>(null)
@@ -12,6 +20,7 @@ const page = ref(1)
 
 const filters = reactive({
   cuisine: '',
+  category: '' as RecipeCategory | '',
   search: '',
   minCalories: null as number | null,
   maxCalories: null as number | null,
@@ -27,6 +36,7 @@ async function loadRecipes() {
   try {
     const result = await fetchRecipes({
       cuisine: filters.cuisine || undefined,
+      category: filters.category || undefined,
       search: filters.search || undefined,
       min_calories: filters.minCalories ?? undefined,
       max_calories: filters.maxCalories ?? undefined,
@@ -49,6 +59,7 @@ function applyFilters() {
 
 function resetFilters() {
   filters.cuisine = ''
+  filters.category = ''
   filters.search = ''
   filters.minCalories = null
   filters.maxCalories = null
@@ -98,6 +109,16 @@ onMounted(async () => {
         <select v-model="filters.cuisine">
           <option value="">Alle</option>
           <option v-for="cuisine in cuisines" :key="cuisine" :value="cuisine">{{ cuisine }}</option>
+        </select>
+      </label>
+
+      <label>
+        Kategorie
+        <select v-model="filters.category">
+          <option value="">Alle</option>
+          <option v-for="category in RECIPE_CATEGORIES" :key="category" :value="category">
+            {{ RECIPE_CATEGORY_LABELS[category] }}
+          </option>
         </select>
       </label>
 
@@ -153,7 +174,10 @@ onMounted(async () => {
         class="recipe-card"
       >
         <h2>{{ recipe.title }}</h2>
-        <p v-if="recipe.cuisine" class="cuisine-badge">{{ recipe.cuisine }}</p>
+        <div class="badges">
+          <p v-if="recipe.cuisine" class="cuisine-badge">{{ recipe.cuisine }}</p>
+          <p v-if="recipe.category" class="category-badge">{{ RECIPE_CATEGORY_LABELS[recipe.category] }}</p>
+        </div>
         <p class="meta">
           <span v-if="recipe.calories_per_serving">{{ recipe.calories_per_serving }} kcal/Portion</span>
           <span>{{ recipe.servings }} Portionen</span>
@@ -353,13 +377,31 @@ button:disabled {
   font-size: 1.05rem;
 }
 
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0 0 0.5rem;
+}
+
 .cuisine-badge {
   display: inline-block;
   font-size: 0.75rem;
   background: var(--color-background-soft);
   border-radius: 999px;
   padding: 0.15rem 0.6rem;
-  margin: 0 0 0.5rem;
+  margin: 0;
+}
+
+.category-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  background: var(--color-accent-soft, var(--color-background-soft));
+  color: var(--color-accent, inherit);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  margin: 0;
 }
 
 .meta {
