@@ -25,7 +25,7 @@ class RecipeController extends Controller
             'max_calories' => ['nullable', 'integer', 'min:0'],
             'ingredients' => ['nullable', 'array'],
             'ingredients.*' => ['string'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:1000'],
         ]);
 
         $recipes = Recipe::query()
