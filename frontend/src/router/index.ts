@@ -3,6 +3,8 @@ import { useAuthStore } from '@/stores/auth'
 import EinkaufslisteView from '../views/EinkaufslisteView.vue'
 import HaushaltView from '../views/HaushaltView.vue'
 import LoginView from '../views/LoginView.vue'
+import PasswortVergessenView from '../views/PasswortVergessenView.vue'
+import PasswortZuruecksetzenView from '../views/PasswortZuruecksetzenView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import RezeptBearbeitenView from '../views/RezeptBearbeitenView.vue'
 import RezeptDetailView from '../views/RezeptDetailView.vue'
@@ -72,6 +74,18 @@ const router = createRouter({
       path: '/register',
       name: 'register',
       component: RegisterView,
+      meta: { guestOnly: true },
+    },
+    {
+      path: '/passwort-vergessen',
+      name: 'forgot-password',
+      component: PasswortVergessenView,
+      meta: { guestOnly: true },
+    },
+    {
+      path: '/passwort-zuruecksetzen',
+      name: 'reset-password',
+      component: PasswortZuruecksetzenView,
       meta: { guestOnly: true },
     },
   ],

@@ -1,24 +1,22 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { extractErrorMessage } from '@/lib/api'
 
 const auth = useAuthStore()
-const router = useRouter()
 
 const email = ref('')
-const password = ref('')
 const errorMessage = ref('')
+const successMessage = ref('')
 const isSubmitting = ref(false)
 
 async function handleSubmit() {
   errorMessage.value = ''
+  successMessage.value = ''
   isSubmitting.value = true
 
   try {
-    await auth.login(email.value, password.value)
-    await router.push({ name: 'wochenplan' })
+    successMessage.value = await auth.forgotPassword(email.value)
   } catch (error) {
     errorMessage.value = extractErrorMessage(error)
   } finally {
@@ -29,31 +27,32 @@ async function handleSubmit() {
 
 <template>
   <main class="auth-form">
-    <h1>Anmelden</h1>
+    <h1>Passwort vergessen</h1>
 
-    <form @submit.prevent="handleSubmit">
-      <label>
-        E-Mail
-        <input v-model="email" type="email" required autocomplete="username" />
-      </label>
+    <template v-if="!successMessage">
+      <p class="hint">
+        Gib deine E-Mail-Adresse ein. Falls dazu ein Account existiert, schicken wir dir einen
+        Link zum Zurücksetzen deines Passworts.
+      </p>
 
-      <label>
-        Passwort
-        <input v-model="password" type="password" required autocomplete="current-password" />
-      </label>
+      <form @submit.prevent="handleSubmit">
+        <label>
+          E-Mail
+          <input v-model="email" type="email" required autocomplete="username" />
+        </label>
 
-      <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+        <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
-      <button type="submit" :disabled="isSubmitting">
-        {{ isSubmitting ? 'Wird angemeldet…' : 'Anmelden' }}
-      </button>
-    </form>
+        <button type="submit" :disabled="isSubmitting">
+          {{ isSubmitting ? 'Wird gesendet…' : 'Link anfordern' }}
+        </button>
+      </form>
+    </template>
+
+    <p v-else class="success">{{ successMessage }}</p>
 
     <p class="switch">
-      <RouterLink to="/passwort-vergessen">Passwort vergessen?</RouterLink>
-    </p>
-    <p class="switch">
-      Noch keinen Account? <RouterLink to="/register">Registrieren</RouterLink>
+      <RouterLink to="/login">Zurück zur Anmeldung</RouterLink>
     </p>
   </main>
 </template>
@@ -66,6 +65,13 @@ async function handleSubmit() {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
+}
+
+.hint {
+  font-size: 0.9rem;
+  opacity: 0.8;
+  margin-bottom: 1rem;
+  line-height: 1.5;
 }
 
 form {
@@ -113,6 +119,11 @@ button:disabled {
 .error {
   color: #e0554f;
   font-size: 0.9rem;
+}
+
+.success {
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 
 .switch {
