@@ -158,6 +158,33 @@ Der letzte Befehl spielt neue Migrationen ein — das passiert nicht mehr
 automatisch, sobald der `migrate`-Container einmal erfolgreich durchgelaufen
 ist.
 
+### Automatisch statt manuell
+
+Das Repo ist öffentlich, also braucht `git pull` auf der NAS keine
+Zugangsdaten. Damit lässt sich das oben stehende Update regelmäßig über den
+Synology-Aufgabenplaner laufen lassen, statt es von Hand einzuspielen:
+
+1. **Paketzentrum → "Git Server" installieren** (liefert den `git`-Befehl
+   für die Shell).
+2. **Systemsteuerung → Aufgabenplaner → Erstellen → Geplante Aufgabe →
+   Benutzerdefiniertes Skript.**
+3. Zeitplan festlegen, z. B. stündlich oder einmal täglich nachts — reicht
+   für ein privates Familienprojekt völlig, und ein Lauf ohne Änderungen ist
+   dank Docker-Layer-Cache in Sekunden durch.
+4. Als Benutzer **root** ausführen (nötig für Docker-Zugriff) mit folgendem
+   Befehl:
+   ```
+   sh /volume1/docker/meal-planner/scripts/update-from-git.sh >> /volume1/docker/meal-planner/update.log 2>&1
+   ```
+   (Pfad an deinen tatsächlichen Projektordner anpassen.)
+
+Das ist bewusst ein Pull auf Zeitplan statt eines Webhooks, der bei jedem
+Push sofort auslöst — kein zusätzlich offener Port/Endpunkt auf der NAS
+nötig, und für dieses Projekt reicht der Zeitversatz von ein paar Stunden
+locker aus. Falls du es doch sofort bei jedem Push haben willst, sag
+Bescheid, das lässt sich mit einem GitHub-Actions-Workflow + einem kleinen
+Webhook-Empfänger nachrüsten.
+
 ## H. Nützliche Befehle
 
 ```bash
