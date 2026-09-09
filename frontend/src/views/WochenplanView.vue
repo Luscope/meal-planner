@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import AddMealModal from '@/components/AddMealModal.vue'
 import AutoPlanModal from '@/components/AutoPlanModal.vue'
 import { extractErrorMessage } from '@/lib/api'
@@ -62,9 +62,18 @@ onMounted(async () => {
   }
 
   await loadWeek()
+
+  await nextTick()
+  if (window.matchMedia('(max-width: 640px)').matches) {
+    document.getElementById('today-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 })
 
 watch(weekStart, loadWeek)
+
+function isToday(day: Date): boolean {
+  return toIsoDate(day) === toIsoDate(new Date())
+}
 
 function previousWeek() {
   weekStart.value = addDays(weekStart.value, -7)
@@ -185,9 +194,16 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
     </div>
 
     <div class="day-list">
-      <section v-for="day in weekDays" :key="`mobile-${toIsoDate(day)}`" class="day-card">
+      <section
+        v-for="day in weekDays"
+        :key="`mobile-${toIsoDate(day)}`"
+        :id="isToday(day) ? 'today-card' : undefined"
+        class="day-card"
+        :class="{ 'is-today': isToday(day) }"
+      >
         <h2 class="day-card-title">
           {{ weekdayLabel(day) }} <span class="date">{{ formatShortDate(day) }}</span>
+          <span v-if="isToday(day)" class="today-badge">Heute</span>
         </h2>
 
         <div v-for="mealType in MEAL_TYPES" :key="mealType" class="meal-section">
@@ -487,10 +503,16 @@ button.link:hover {
   }
 
   .day-card {
+    scroll-margin-top: 76px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-sm);
     padding: 1rem;
+  }
+
+  .day-card.is-today {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 1px var(--color-accent);
   }
 
   .day-card-title {
@@ -501,6 +523,17 @@ button.link:hover {
   .day-card-title .date {
     font-weight: 400;
     opacity: 0.7;
+  }
+
+  .today-badge {
+    margin-left: 0.5rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    background: var(--color-accent);
+    color: var(--color-button-text);
+    font-size: 0.7rem;
+    font-weight: 600;
+    vertical-align: middle;
   }
 
   .meal-section {
