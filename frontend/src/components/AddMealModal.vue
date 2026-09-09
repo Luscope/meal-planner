@@ -159,6 +159,8 @@ async function handleSubmit() {
         v-if="selectedRecipeId"
         :to="{ name: 'recipe-detail', params: { id: selectedRecipeId } }"
         class="recipe-view-link"
+        target="_blank"
+        rel="noopener noreferrer"
       >
         📖 Rezept ansehen
       </RouterLink>
