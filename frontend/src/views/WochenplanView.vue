@@ -140,7 +140,7 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
     <p v-if="isLoading" class="hint">Lädt…</p>
 
-    <div class="grid-wrapper">
+    <div class="grid-wrapper week-grid-wrapper">
       <table class="grid">
         <thead>
           <tr>
@@ -182,6 +182,41 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <div class="day-list">
+      <section v-for="day in weekDays" :key="`mobile-${toIsoDate(day)}`" class="day-card">
+        <h2 class="day-card-title">
+          {{ weekdayLabel(day) }} <span class="date">{{ formatShortDate(day) }}</span>
+        </h2>
+
+        <div v-for="mealType in MEAL_TYPES" :key="mealType" class="meal-section">
+          <h3 class="meal-section-title">{{ MEAL_TYPE_LABELS[mealType] }}</h3>
+
+          <div
+            v-for="entry in entriesFor(day, mealType)"
+            :key="entry.id"
+            class="meal-chip"
+            role="button"
+            tabindex="0"
+            @click="openEditModal(day, mealType, entry)"
+            @keydown.enter="openEditModal(day, mealType, entry)"
+          >
+            <button class="remove" type="button" title="Entfernen" @click.stop="handleDelete(entry.id)">
+              ×
+            </button>
+            <div class="chip-title">{{ entry.recipe.title }}</div>
+            <div v-if="entry.recipe.calories_per_serving" class="chip-meta">
+              {{ entry.recipe.calories_per_serving }} kcal/Portion
+            </div>
+            <div v-if="entry.family_members.length" class="chip-members">
+              {{ entry.family_members.map((member) => member.name).join(', ') }}
+            </div>
+          </div>
+
+          <button class="add-button" type="button" @click="openModal(day, mealType)">+ Mahlzeit</button>
+        </div>
+      </section>
     </div>
 
     <section v-if="summary && summary.family_members.length" class="summary">
@@ -426,5 +461,95 @@ button.link:hover {
 
 .muted {
   opacity: 0.4;
+}
+
+.day-list {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .wochenplan {
+    padding: 1rem;
+  }
+
+  .week-nav {
+    justify-content: center;
+  }
+
+  .week-grid-wrapper {
+    display: none;
+  }
+
+  .day-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .day-card {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    padding: 1rem;
+  }
+
+  .day-card-title {
+    margin: 0 0 0.85rem;
+    font-size: 1.15rem;
+  }
+
+  .day-card-title .date {
+    font-weight: 400;
+    opacity: 0.7;
+  }
+
+  .meal-section {
+    margin-bottom: 1rem;
+  }
+
+  .meal-section:last-child {
+    margin-bottom: 0;
+  }
+
+  .meal-section-title {
+    margin: 0 0 0.5rem;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    opacity: 0.65;
+  }
+
+  .day-list .meal-chip {
+    padding: 0.65rem 2.25rem 0.65rem 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .day-list .chip-title {
+    font-size: 1rem;
+  }
+
+  .day-list .chip-meta,
+  .day-list .chip-members {
+    font-size: 0.85rem;
+    margin-top: 0.2rem;
+  }
+
+  .day-list .remove {
+    font-size: 1.3rem;
+    top: 0.5rem;
+    right: 0.6rem;
+  }
+
+  .day-list .add-button {
+    font-size: 0.9rem;
+    padding: 0.6rem;
+    min-height: 44px;
+  }
+
+  .summary-table th,
+  .summary-table td {
+    padding: 0.5rem 0.4rem;
+    font-size: 0.8rem;
+  }
 }
 </style>
