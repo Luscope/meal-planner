@@ -155,6 +155,14 @@ async function handleSubmit() {
         >{{ MEAL_TYPE_LABELS[mealType] }} · {{ weekdayLabel(date) }}, {{ formatShortDate(date) }}
       </h2>
 
+      <RouterLink
+        v-if="selectedRecipeId"
+        :to="{ name: 'recipe-detail', params: { id: selectedRecipeId } }"
+        class="recipe-view-link"
+      >
+        📖 Rezept ansehen
+      </RouterLink>
+
       <form @submit.prevent="handleSubmit">
         <label>
           Rezept
@@ -264,6 +272,29 @@ async function handleSubmit() {
 h2 {
   margin-top: 0;
   font-size: 1.1rem;
+}
+
+.recipe-view-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  padding: 0.65rem 1rem;
+  min-height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-background-soft);
+  color: var(--color-accent);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.recipe-view-link:hover,
+.recipe-view-link:focus-visible {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-sm);
 }
 
 form {
