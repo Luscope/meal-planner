@@ -19,6 +19,31 @@ import {
   type Summary,
 } from '@/lib/mealPlanner'
 
+type ViewMode = 'grid' | 'list'
+
+const VIEW_MODE_STORAGE_KEY = 'wochenplan-view-mode'
+
+function loadInitialViewMode(): ViewMode {
+  try {
+    const stored = localStorage.getItem(VIEW_MODE_STORAGE_KEY)
+    if (stored === 'grid' || stored === 'list') return stored
+  } catch {
+    // localStorage unavailable (private mode etc.) — fall back to the default below
+  }
+  return window.matchMedia('(max-width: 640px)').matches ? 'list' : 'grid'
+}
+
+const viewMode = ref<ViewMode>(loadInitialViewMode())
+
+function setViewMode(mode: ViewMode) {
+  viewMode.value = mode
+  try {
+    localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode)
+  } catch {
+    // ignore — the choice just won't persist across visits
+  }
+}
+
 const weekStart = ref(startOfWeek(new Date()))
 const mealPlans = ref<MealPlan[]>([])
 const familyMembers = ref<FamilyMember[]>([])
@@ -64,7 +89,7 @@ onMounted(async () => {
   await loadWeek()
 
   await nextTick()
-  if (window.matchMedia('(max-width: 640px)').matches) {
+  if (viewMode.value === 'list') {
     document.getElementById('today-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 })
@@ -146,10 +171,27 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
       </button>
     </div>
 
+    <div class="view-toggle">
+      <button
+        type="button"
+        :class="{ active: viewMode === 'grid' }"
+        @click="setViewMode('grid')"
+      >
+        📅 Kalender
+      </button>
+      <button
+        type="button"
+        :class="{ active: viewMode === 'list' }"
+        @click="setViewMode('list')"
+      >
+        📋 Liste
+      </button>
+    </div>
+
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
     <p v-if="isLoading" class="hint">Lädt…</p>
 
-    <div class="grid-wrapper week-grid-wrapper">
+    <div v-show="viewMode === 'grid'" class="grid-wrapper week-grid-wrapper">
       <table class="grid">
         <thead>
           <tr>
@@ -193,7 +235,7 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
       </table>
     </div>
 
-    <div class="day-list">
+    <div v-show="viewMode === 'list'" class="day-list">
       <section
         v-for="day in weekDays"
         :key="`mobile-${toIsoDate(day)}`"
@@ -355,6 +397,23 @@ button.link:hover {
   box-shadow: var(--shadow-md);
 }
 
+.view-toggle {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.view-toggle button {
+  background: var(--color-background);
+}
+
+.view-toggle button.active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-button-text);
+}
+
 .error {
   color: #e0554f;
 }
@@ -480,7 +539,86 @@ button.link:hover {
 }
 
 .day-list {
-  display: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.day-card {
+  scroll-margin-top: 76px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem;
+}
+
+.day-card.is-today {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.day-card-title {
+  margin: 0 0 0.85rem;
+  font-size: 1.15rem;
+}
+
+.day-card-title .date {
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.today-badge {
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-button-text);
+  font-size: 0.7rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.meal-section {
+  margin-bottom: 1rem;
+}
+
+.meal-section:last-child {
+  margin-bottom: 0;
+}
+
+.meal-section-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.65;
+}
+
+.day-list .meal-chip {
+  padding: 0.65rem 2.25rem 0.65rem 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.day-list .chip-title {
+  font-size: 1rem;
+}
+
+.day-list .chip-meta,
+.day-list .chip-members {
+  font-size: 0.85rem;
+  margin-top: 0.2rem;
+}
+
+.day-list .remove {
+  font-size: 1.3rem;
+  top: 0.5rem;
+  right: 0.6rem;
+}
+
+.day-list .add-button {
+  font-size: 0.9rem;
+  padding: 0.6rem;
+  min-height: 44px;
 }
 
 @media (max-width: 640px) {
@@ -490,93 +628,6 @@ button.link:hover {
 
   .week-nav {
     justify-content: center;
-  }
-
-  .week-grid-wrapper {
-    display: none;
-  }
-
-  .day-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
-  }
-
-  .day-card {
-    scroll-margin-top: 76px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-sm);
-    padding: 1rem;
-  }
-
-  .day-card.is-today {
-    border-color: var(--color-accent);
-    box-shadow: 0 0 0 1px var(--color-accent);
-  }
-
-  .day-card-title {
-    margin: 0 0 0.85rem;
-    font-size: 1.15rem;
-  }
-
-  .day-card-title .date {
-    font-weight: 400;
-    opacity: 0.7;
-  }
-
-  .today-badge {
-    margin-left: 0.5rem;
-    padding: 0.15rem 0.55rem;
-    border-radius: 999px;
-    background: var(--color-accent);
-    color: var(--color-button-text);
-    font-size: 0.7rem;
-    font-weight: 600;
-    vertical-align: middle;
-  }
-
-  .meal-section {
-    margin-bottom: 1rem;
-  }
-
-  .meal-section:last-child {
-    margin-bottom: 0;
-  }
-
-  .meal-section-title {
-    margin: 0 0 0.5rem;
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    opacity: 0.65;
-  }
-
-  .day-list .meal-chip {
-    padding: 0.65rem 2.25rem 0.65rem 0.75rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .day-list .chip-title {
-    font-size: 1rem;
-  }
-
-  .day-list .chip-meta,
-  .day-list .chip-members {
-    font-size: 0.85rem;
-    margin-top: 0.2rem;
-  }
-
-  .day-list .remove {
-    font-size: 1.3rem;
-    top: 0.5rem;
-    right: 0.6rem;
-  }
-
-  .day-list .add-button {
-    font-size: 0.9rem;
-    padding: 0.6rem;
-    min-height: 44px;
   }
 
   .summary-table th,
