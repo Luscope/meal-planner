@@ -70,6 +70,26 @@ test('filters recipes requiring all given ingredients', function () {
         ->assertJsonPath('data.0.title', 'Hähnchen mit Reis');
 });
 
+test('filters recipes by category', function () {
+    [$household] = actingAsHouseholdUser();
+
+    Recipe::factory()->for($household)->create(['category' => 'dessert']);
+    Recipe::factory()->for($household)->create(['category' => 'main_course']);
+
+    $response = $this->getJson('/api/recipes?category=dessert');
+
+    $response->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.category', 'dessert');
+});
+
+test('rejects an invalid category filter value', function () {
+    actingAsHouseholdUser();
+
+    $this->getJson('/api/recipes?category=not-a-real-category')
+        ->assertStatus(422);
+});
+
 test('recipes are scoped to the requesting household', function () {
     [$household] = actingAsHouseholdUser();
     $otherHousehold = Household::factory()->create();

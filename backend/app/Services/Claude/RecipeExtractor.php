@@ -3,6 +3,7 @@
 namespace App\Services\Claude;
 
 use Anthropic\Client;
+use App\Enums\RecipeCategory;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -27,6 +28,13 @@ class RecipeExtractor
         $html = Http::timeout(15)->get($url)->body();
         $text = trim(preg_replace('/\s+/', ' ', strip_tags($html)));
         $text = mb_substr($text, 0, 15000);
+
+        if (mb_strlen($text) < 300) {
+            throw new RuntimeException(
+                'Die Seite lieferte kaum Text (nur '.mb_strlen($text).' Zeichen) — vermutlich verhindert ein '
+                .'Cookie-Banner, eine Paywall oder clientseitiges Rendering den Zugriff auf den eigentlichen Inhalt.'
+            );
+        }
 
         return $this->extract([
             ['type' => 'text', 'text' => $this->buildPrompt($text, $url)],
@@ -72,11 +80,37 @@ class RecipeExtractor
 
         foreach ($response->content as $block) {
             if ($block->type === 'text') {
-                return json_decode($block->text, associative: true, flags: JSON_THROW_ON_ERROR);
+                $data = json_decode($block->text, associative: true, flags: JSON_THROW_ON_ERROR);
+
+                $this->assertPlausibleRecipe($data);
+
+                return $data;
             }
         }
 
         throw new RuntimeException('Claude response contained no text block.');
+    }
+
+    /**
+     * The structured-output schema still leaves room for a technically valid
+     * but meaningless response (e.g. a single placeholder ingredient with
+     * quantity 0, name "unavailable") when Claude can't find a real recipe in
+     * the source but has no way to signal that within a forced JSON response.
+     *
+     * Only reject when *every* ingredient has a non-positive quantity — real
+     * recipes routinely include one or two unmeasured items (Wasser, Salz
+     * nach Geschmack, Öl zum Braten), so a single zero is normal, but an
+     * entirely zero-quantity ingredient list is the placeholder-response
+     * fingerprint we're actually guarding against.
+     */
+    private function assertPlausibleRecipe(array $data): void
+    {
+        $hasReasonableQuantity = collect($data['ingredients'])
+            ->contains(fn ($ingredient) => ($ingredient['quantity'] ?? 0) > 0);
+
+        if (! $hasReasonableQuantity) {
+            throw new RuntimeException('Claude konnte kein plausibles Rezept aus der Quelle extrahieren.');
+        }
     }
 
     private function schema(): array
@@ -84,8 +118,13 @@ class RecipeExtractor
         return [
             'type' => 'object',
             'properties' => [
-                'title' => ['type' => 'string'],
+                'title' => ['type' => 'string', 'minLength' => 1],
                 'cuisine' => ['type' => ['string', 'null'], 'description' => 'e.g. vietnamesisch, japanisch, thailändisch, italienisch, deutsch'],
+                'category' => [
+                    'type' => 'string',
+                    'enum' => array_column(RecipeCategory::cases(), 'value'),
+                    'description' => 'The best-fitting course/category for this dish: appetizer (Vorspeise), main_course (Hauptspeise), side_dish (Beilage), dessert (Dessert), snack (Snack), or drink (Getränk). Pick the single best match even if not stated explicitly by the source.',
+                ],
                 'description' => ['type' => ['string', 'null']],
                 'servings' => ['type' => 'integer'],
                 'prep_time_minutes' => ['type' => ['integer', 'null']],
@@ -96,7 +135,8 @@ class RecipeExtractor
                 'fat_per_serving_g' => ['type' => ['number', 'null']],
                 'instructions' => [
                     'type' => 'array',
-                    'items' => ['type' => 'string'],
+                    'items' => ['type' => 'string', 'minLength' => 1],
+                    'minItems' => 1,
                     'description' => 'Ordered list of preparation steps',
                 ],
                 'ingredients' => [
@@ -104,17 +144,18 @@ class RecipeExtractor
                     'items' => [
                         'type' => 'object',
                         'properties' => [
-                            'name' => ['type' => 'string'],
+                            'name' => ['type' => 'string', 'minLength' => 1],
                             'quantity' => ['type' => 'number'],
-                            'unit' => ['type' => 'string'],
+                            'unit' => ['type' => 'string', 'minLength' => 1],
                             'notes' => ['type' => ['string', 'null']],
                         ],
                         'required' => ['name', 'quantity', 'unit'],
                         'additionalProperties' => false,
                     ],
+                    'minItems' => 1,
                 ],
             ],
-            'required' => ['title', 'servings', 'instructions', 'ingredients'],
+            'required' => ['title', 'category', 'servings', 'instructions', 'ingredients'],
             'additionalProperties' => false,
         ];
     }

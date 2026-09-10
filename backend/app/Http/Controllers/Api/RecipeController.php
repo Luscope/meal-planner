@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\RecipeCategory;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\RecipeResource;
 use App\Models\Ingredient;
@@ -10,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Arr;
+use Illuminate\Validation\Rule;
 
 class RecipeController extends Controller
 {
@@ -17,17 +19,19 @@ class RecipeController extends Controller
     {
         $validated = $request->validate([
             'cuisine' => ['nullable', 'string'],
+            'category' => ['nullable', Rule::in(array_column(RecipeCategory::cases(), 'value'))],
             'search' => ['nullable', 'string'],
             'min_calories' => ['nullable', 'integer', 'min:0'],
             'max_calories' => ['nullable', 'integer', 'min:0'],
             'ingredients' => ['nullable', 'array'],
             'ingredients.*' => ['string'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:1000'],
         ]);
 
         $recipes = Recipe::query()
             ->where('household_id', $request->user()->household_id)
             ->when($validated['cuisine'] ?? null, fn ($q, $cuisine) => $q->where('cuisine', 'like', "%{$cuisine}%"))
+            ->when($validated['category'] ?? null, fn ($q, $category) => $q->where('category', $category))
             ->when($validated['search'] ?? null, fn ($q, $search) => $q->where('title', 'like', "%{$search}%"))
             ->when($validated['min_calories'] ?? null, fn ($q, $min) => $q->where('calories_per_serving', '>=', $min))
             ->when($validated['max_calories'] ?? null, fn ($q, $max) => $q->where('calories_per_serving', '<=', $max))
@@ -64,6 +68,7 @@ class RecipeController extends Controller
         $validated = $request->validate([
             'title' => ['sometimes', 'string', 'max:255'],
             'cuisine' => ['nullable', 'string', 'max:255'],
+            'category' => ['nullable', Rule::in(array_column(RecipeCategory::cases(), 'value'))],
             'description' => ['nullable', 'string'],
             'instructions' => ['sometimes', 'array', 'min:1'],
             'instructions.*' => ['string'],

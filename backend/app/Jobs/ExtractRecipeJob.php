@@ -71,6 +71,7 @@ class ExtractRecipeJob implements ShouldQueue
             'created_by_user_id' => $this->recipeImport->created_by_user_id,
             'title' => $data['title'],
             'cuisine' => $data['cuisine'] ?? null,
+            'category' => $data['category'] ?? null,
             'description' => $data['description'] ?? null,
             'instructions' => $data['instructions'],
             'servings' => $data['servings'],

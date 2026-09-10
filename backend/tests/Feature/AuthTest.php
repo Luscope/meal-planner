@@ -3,8 +3,12 @@
 use App\Models\FamilyMember;
 use App\Models\Household;
 use App\Models\User;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Password;
 use Laravel\Sanctum\PersonalAccessToken;
 
 uses(RefreshDatabase::class);
@@ -146,4 +150,60 @@ test('logout revokes the current token', function () {
         ->assertNoContent();
 
     expect(PersonalAccessToken::find($newToken->accessToken->id))->toBeNull();
+});
+
+test('requesting a password reset for a registered email queues a reset notification', function () {
+    Notification::fake();
+
+    $user = User::factory()->create(['email' => 'luisa@example.com']);
+
+    $this->postJson('/api/forgot-password', ['email' => 'luisa@example.com'])
+        ->assertOk()
+        ->assertJsonStructure(['message']);
+
+    Notification::assertSentTo($user, ResetPassword::class);
+});
+
+test('requesting a password reset for an unknown email still returns a generic success response', function () {
+    Notification::fake();
+
+    $response = $this->postJson('/api/forgot-password', ['email' => 'unbekannt@example.com']);
+
+    $response->assertOk()->assertJsonStructure(['message']);
+    Notification::assertNothingSent();
+});
+
+test('resets the password with a valid token and revokes existing tokens', function () {
+    $user = User::factory()->create(['email' => 'luisa@example.com', 'password' => 'old-password-123']);
+    $existingToken = $user->createToken('api');
+    $token = Password::createToken($user);
+
+    $response = $this->postJson('/api/reset-password', [
+        'token' => $token,
+        'email' => 'luisa@example.com',
+        'password' => 'new-password-456',
+        'password_confirmation' => 'new-password-456',
+    ]);
+
+    $response->assertOk();
+
+    expect(PersonalAccessToken::find($existingToken->accessToken->id))->toBeNull();
+
+    $this->postJson('/api/login', [
+        'email' => 'luisa@example.com',
+        'password' => 'new-password-456',
+    ])->assertOk();
+});
+
+test('rejects resetting the password with an invalid token', function () {
+    $user = User::factory()->create(['email' => 'luisa@example.com']);
+
+    $this->postJson('/api/reset-password', [
+        'token' => 'not-a-real-token',
+        'email' => 'luisa@example.com',
+        'password' => 'new-password-456',
+        'password_confirmation' => 'new-password-456',
+    ])->assertStatus(422);
+
+    expect(Hash::check('new-password-456', $user->fresh()->password))->toBeFalse();
 });
