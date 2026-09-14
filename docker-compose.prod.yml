@@ -30,7 +30,7 @@ services:
     build:
       context: .
       dockerfile: docker/php/Dockerfile.prod
-    command: ["php", "artisan", "queue:work", "--tries=3", "--sleep=1", "--timeout=180"]
+    command: ["php", "artisan", "queue:work", "--tries=3", "--sleep=1", "--timeout=180", "--max-time=3600"]
     restart: unless-stopped
     env_file:
       - ./backend/.env

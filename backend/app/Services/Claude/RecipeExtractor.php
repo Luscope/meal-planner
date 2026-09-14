@@ -4,6 +4,7 @@ namespace App\Services\Claude;
 
 use Anthropic\Client;
 use App\Enums\RecipeCategory;
+use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -13,7 +14,22 @@ class RecipeExtractor
 
     public function __construct()
     {
-        $this->client = new Client(apiKey: config('services.anthropic.key'));
+        // The Anthropic SDK's own `timeout` request option is advisory only
+        // (never read internally) — it relies entirely on the transporter to
+        // enforce it. Without an explicit one, a stalled connection can hang
+        // indefinitely: PHP's pcntl-based job timeout can't reliably
+        // interrupt a blocking curl call, which previously wedged the queue
+        // worker until it was restarted manually. A pre-configured Guzzle
+        // transporter enforces the timeout at the curl level instead.
+        $this->client = new Client(
+            apiKey: config('services.anthropic.key'),
+            requestOptions: [
+                'transporter' => new GuzzleClient([
+                    'connect_timeout' => 10,
+                    'timeout' => 120,
+                ]),
+            ],
+        );
     }
 
     public function extractFromText(string $text): array
