@@ -26,6 +26,17 @@ export const RECIPE_CATEGORY_LABELS: Record<RecipeCategory, string> = {
   drink: 'Getränk',
 }
 
+export type DietType = 'omnivore' | 'pescetarian' | 'vegetarian' | 'vegan'
+
+export const DIET_TYPES: DietType[] = ['omnivore', 'pescetarian', 'vegetarian', 'vegan']
+
+export const DIET_TYPE_LABELS: Record<DietType, string> = {
+  omnivore: 'Omnivor',
+  pescetarian: 'Pescetarisch',
+  vegetarian: 'Vegetarisch',
+  vegan: 'Vegan',
+}
+
 export interface RecipeIngredient {
   id: number
   name: string
@@ -39,6 +50,7 @@ export interface Recipe {
   title: string
   cuisine: string | null
   category: RecipeCategory | null
+  diet_type: DietType | null
   description: string | null
   servings: number
   prep_time_minutes: number | null
@@ -57,6 +69,7 @@ export interface Recipe {
 export interface RecipeFilters {
   cuisine?: string
   category?: RecipeCategory
+  diet_type?: DietType
   search?: string
   min_calories?: number
   max_calories?: number
@@ -101,6 +114,7 @@ export interface UpdateRecipePayload {
   title?: string
   cuisine?: string | null
   category?: RecipeCategory | null
+  diet_type?: DietType | null
   description?: string | null
   instructions?: string[]
   servings?: number

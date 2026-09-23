@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\DietType;
 use App\Enums\RecipeCategory;
 use App\Enums\RecipeSourceType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -20,6 +21,7 @@ class Recipe extends Model
         'title',
         'cuisine',
         'category',
+        'diet_type',
         'description',
         'instructions',
         'servings',
@@ -42,6 +44,7 @@ class Recipe extends Model
             'raw_import_payload' => 'array',
             'source_type' => RecipeSourceType::class,
             'category' => RecipeCategory::class,
+            'diet_type' => DietType::class,
             'protein_per_serving_g' => 'decimal:2',
             'carbs_per_serving_g' => 'decimal:2',
             'fat_per_serving_g' => 'decimal:2',

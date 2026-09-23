@@ -90,6 +90,26 @@ test('rejects an invalid category filter value', function () {
         ->assertStatus(422);
 });
 
+test('filters recipes by diet type', function () {
+    [$household] = actingAsHouseholdUser();
+
+    Recipe::factory()->for($household)->create(['diet_type' => 'vegan']);
+    Recipe::factory()->for($household)->create(['diet_type' => 'omnivore']);
+
+    $response = $this->getJson('/api/recipes?diet_type=vegan');
+
+    $response->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.diet_type', 'vegan');
+});
+
+test('rejects an invalid diet_type filter value', function () {
+    actingAsHouseholdUser();
+
+    $this->getJson('/api/recipes?diet_type=not-a-real-diet')
+        ->assertStatus(422);
+});
+
 test('recipes are scoped to the requesting household', function () {
     [$household] = actingAsHouseholdUser();
     $otherHousehold = Household::factory()->create();

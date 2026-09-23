@@ -3,6 +3,7 @@
 namespace App\Services\Claude;
 
 use Anthropic\Client;
+use App\Enums\DietType;
 use App\Enums\RecipeCategory;
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Support\Facades\Http;
@@ -55,6 +56,71 @@ class RecipeExtractor
         return $this->extract([
             ['type' => 'text', 'text' => $this->buildPrompt($text, $url)],
         ]);
+    }
+
+    /**
+     * Classifies an existing recipe's diet type from its title and
+     * ingredient list alone. Deliberately a separate, cheaper/faster call
+     * than the full extraction — this is a judgment over a short ingredient
+     * list, not multi-field extraction from raw source text. Uses Sonnet
+     * rather than Haiku: an earlier Haiku pass misclassified a dish as
+     * omnivore purely because its German title happened to contain the
+     * substring "Omni" (title: "Omnianische Sonnenboote", a butter/banana/
+     * rum dessert with no meat or fish) — Sonnet handles the "ignore the
+     * title wording" instruction below reliably in spot checks.
+     *
+     * @param  list<string>  $ingredientNames
+     */
+    public function classifyDietType(string $title, array $ingredientNames): DietType
+    {
+        $response = $this->client->messages->create(
+            model: 'claude-sonnet-5',
+            maxTokens: 256,
+            messages: [
+                ['role' => 'user', 'content' => [
+                    ['type' => 'text', 'text' => $this->buildDietTypePrompt($title, $ingredientNames)],
+                ]],
+            ],
+            outputConfig: [
+                'format' => ['type' => 'json_schema', 'schema' => $this->dietTypeSchema()],
+            ],
+        );
+
+        foreach ($response->content as $block) {
+            if ($block->type === 'text') {
+                $data = json_decode($block->text, associative: true, flags: JSON_THROW_ON_ERROR);
+
+                return DietType::from($data['diet_type']);
+            }
+        }
+
+        throw new RuntimeException('Claude response contained no text block.');
+    }
+
+    private function buildDietTypePrompt(string $title, array $ingredientNames): string
+    {
+        $ingredients = implode(', ', $ingredientNames);
+
+        return "Recipe title: {$title}\nIngredients: {$ingredients}\n\n"
+            .'Classify the most restrictive diet this dish qualifies for. Base this decision strictly on the '
+            .'literal ingredients list above — ignore what the title sounds like or happens to contain '
+            .'(titles are just names and may coincidentally contain misleading substrings).';
+    }
+
+    private function dietTypeSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'diet_type' => [
+                    'type' => 'string',
+                    'enum' => array_column(DietType::cases(), 'value'),
+                    'description' => 'vegan (no animal products at all, including dairy, eggs, honey), vegetarian (no meat or fish/seafood, but dairy/eggs/honey OK), pescetarian (no meat, but fish/seafood OK), or omnivore (contains meat or poultry).',
+                ],
+            ],
+            'required' => ['diet_type'],
+            'additionalProperties' => false,
+        ];
     }
 
     public function extractFromImage(string $base64, string $mediaType): array
@@ -141,6 +207,11 @@ class RecipeExtractor
                     'enum' => array_column(RecipeCategory::cases(), 'value'),
                     'description' => 'The best-fitting course/category for this dish: appetizer (Vorspeise), main_course (Hauptspeise), side_dish (Beilage), dessert (Dessert), snack (Snack), or drink (Getränk). Pick the single best match even if not stated explicitly by the source.',
                 ],
+                'diet_type' => [
+                    'type' => 'string',
+                    'enum' => array_column(DietType::cases(), 'value'),
+                    'description' => 'The most restrictive diet this dish qualifies for, based on its ingredients: vegan (no animal products at all, including dairy, eggs, honey), vegetarian (no meat or fish/seafood, but dairy/eggs/honey OK), pescetarian (no meat, but fish/seafood OK), or omnivore (contains meat or poultry). Judge from the actual ingredient list, not the dish name.',
+                ],
                 'description' => ['type' => ['string', 'null']],
                 'servings' => ['type' => 'integer'],
                 'prep_time_minutes' => ['type' => ['integer', 'null']],
@@ -171,7 +242,7 @@ class RecipeExtractor
                     'minItems' => 1,
                 ],
             ],
-            'required' => ['title', 'category', 'servings', 'instructions', 'ingredients'],
+            'required' => ['title', 'category', 'diet_type', 'servings', 'instructions', 'ingredients'],
             'additionalProperties' => false,
         ];
     }

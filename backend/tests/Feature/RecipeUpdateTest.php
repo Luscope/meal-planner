@@ -43,6 +43,24 @@ test('rejects an invalid category value on update', function () {
         ->assertStatus(422);
 });
 
+test('updates the recipe diet type', function () {
+    [$household] = actingAsHouseholdUser();
+    $recipe = Recipe::factory()->for($household)->create(['diet_type' => 'omnivore']);
+
+    $response = $this->patchJson("/api/recipes/{$recipe->id}", ['diet_type' => 'vegan']);
+
+    $response->assertOk()->assertJsonPath('data.diet_type', 'vegan');
+    expect($recipe->fresh()->diet_type)->toBe(App\Enums\DietType::Vegan);
+});
+
+test('rejects an invalid diet_type value on update', function () {
+    [$household] = actingAsHouseholdUser();
+    $recipe = Recipe::factory()->for($household)->create();
+
+    $this->patchJson("/api/recipes/{$recipe->id}", ['diet_type' => 'not-a-real-diet'])
+        ->assertStatus(422);
+});
+
 test('replaces the ingredient list when ingredients are provided', function () {
     [$household] = actingAsHouseholdUser();
     $recipe = Recipe::factory()->for($household)->create();
