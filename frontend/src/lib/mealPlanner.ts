@@ -88,7 +88,7 @@ export async function fetchFamilyMembers(): Promise<FamilyMember[]> {
 }
 
 export async function fetchRecipesForPicker(): Promise<RecipePickerItem[]> {
-  const response = await api.get('/recipes', { params: { per_page: 100 } })
+  const response = await api.get('/recipes', { params: { per_page: 1000 } })
   return response.data.data
 }
 

@@ -5,6 +5,7 @@ use App\Models\RecipeImport;
 use App\Models\User;
 use App\Services\Claude\RecipeExtractor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
@@ -49,6 +50,34 @@ test('importing a recipe from text creates a recipe with ingredients', function 
         ->and($recipeImport->recipe)->not->toBeNull()
         ->and($recipeImport->recipe->title)->toBe('Pad Thai')
         ->and($recipeImport->recipe->ingredients)->toHaveCount(2);
+});
+
+test('fails cleanly instead of creating a blank recipe when a URL returns too little text', function () {
+    config(['queue.default' => 'sync']);
+
+    Http::fake([
+        'thin-page.example/*' => Http::response(
+            '<html><body><div id="cookie-consent">Bitte Cookies akzeptieren.</div></body></html>',
+            200
+        ),
+    ]);
+
+    $household = Household::factory()->create();
+    $user = User::factory()->for($household)->create();
+
+    Sanctum::actingAs($user);
+
+    $response = $this->postJson('/api/recipe-imports', [
+        'url' => 'https://thin-page.example/rezept',
+    ]);
+
+    $response->assertStatus(202);
+
+    $recipeImport = RecipeImport::first();
+
+    expect($recipeImport->status->value)->toBe('failed')
+        ->and($recipeImport->recipe_id)->toBeNull()
+        ->and($recipeImport->error_message)->toContain('Cookie-Banner');
 });
 
 test('rejects a request with no or multiple import sources', function () {

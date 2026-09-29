@@ -28,8 +28,12 @@ COPY docker/php/opcache-overrides.ini /usr/local/etc/php/conf.d/zz-opcache-overr
 
 WORKDIR /var/www/html
 
-COPY docker/php/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+COPY backend/composer.json backend/composer.lock ./
+RUN composer install --no-dev --no-interaction --prefer-dist --no-scripts --no-autoloader
 
-ENTRYPOINT ["entrypoint.sh"]
+COPY backend/ ./
+
+RUN composer dump-autoload --no-dev --optimize \
+    && chown -R www-data:www-data storage bootstrap/cache
+
 CMD ["php-fpm"]

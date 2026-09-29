@@ -2,7 +2,16 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { extractErrorMessage } from '@/lib/api'
-import { fetchRecipe, updateRecipe } from '@/lib/recipes'
+import {
+  DIET_TYPES,
+  DIET_TYPE_LABELS,
+  fetchRecipe,
+  RECIPE_CATEGORIES,
+  RECIPE_CATEGORY_LABELS,
+  updateRecipe,
+  type DietType,
+  type RecipeCategory,
+} from '@/lib/recipes'
 
 const route = useRoute()
 const router = useRouter()
@@ -10,6 +19,8 @@ const recipeId = route.params.id as string
 
 const title = ref('')
 const cuisine = ref('')
+const category = ref<RecipeCategory | ''>('')
+const dietType = ref<DietType | ''>('')
 const description = ref('')
 const instructionsText = ref('')
 const servings = ref<number | null>(null)
@@ -49,6 +60,8 @@ onMounted(async () => {
 
     title.value = recipe.title
     cuisine.value = recipe.cuisine ?? ''
+    category.value = recipe.category ?? ''
+    dietType.value = recipe.diet_type ?? ''
     description.value = recipe.description ?? ''
     instructionsText.value = recipe.instructions.join('\n')
     servings.value = recipe.servings
@@ -101,6 +114,8 @@ async function handleSubmit() {
     await updateRecipe(recipeId, {
       title: title.value,
       cuisine: cuisine.value || null,
+      category: category.value || null,
+      diet_type: dietType.value || null,
       description: description.value || null,
       instructions,
       servings: servings.value ?? undefined,
@@ -146,6 +161,26 @@ async function handleSubmit() {
       <label>
         Küche (optional)
         <input v-model="cuisine" type="text" />
+      </label>
+
+      <label>
+        Kategorie
+        <select v-model="category">
+          <option value="">Keine Angabe</option>
+          <option v-for="option in RECIPE_CATEGORIES" :key="option" :value="option">
+            {{ RECIPE_CATEGORY_LABELS[option] }}
+          </option>
+        </select>
+      </label>
+
+      <label>
+        Ernährungsform
+        <select v-model="dietType">
+          <option value="">Keine Angabe</option>
+          <option v-for="option in DIET_TYPES" :key="option" :value="option">
+            {{ DIET_TYPE_LABELS[option] }}
+          </option>
+        </select>
       </label>
 
       <label>
@@ -258,7 +293,8 @@ label {
 }
 
 input,
-textarea {
+textarea,
+select {
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { extractErrorMessage } from '@/lib/api'
 import {
   createMealPlan,
@@ -35,6 +35,60 @@ const plannedServings = ref<number | null>(
 const errorMessage = ref('')
 const isSubmitting = ref(false)
 
+const recipeSearch = ref(props.mealPlan?.recipe.title ?? '')
+const isRecipeListOpen = ref(false)
+const highlightedIndex = ref(-1)
+
+const filteredRecipes = computed(() => {
+  const query = recipeSearch.value.trim().toLowerCase()
+  if (!query) return props.recipes
+  return props.recipes.filter((recipe) => recipe.title.toLowerCase().includes(query))
+})
+
+watch(recipeSearch, () => {
+  highlightedIndex.value = -1
+
+  const selected = props.recipes.find((recipe) => recipe.id === selectedRecipeId.value)
+  if (!selected || selected.title !== recipeSearch.value) {
+    selectedRecipeId.value = null
+  }
+})
+
+function openRecipeList(event: FocusEvent) {
+  isRecipeListOpen.value = true
+  ;(event.target as HTMLInputElement).select()
+}
+
+function closeRecipeListDelayed() {
+  window.setTimeout(() => {
+    isRecipeListOpen.value = false
+  }, 150)
+}
+
+function selectRecipe(recipe: RecipePickerItem) {
+  selectedRecipeId.value = recipe.id
+  recipeSearch.value = recipe.title
+  plannedServings.value = recipe.servings
+  isRecipeListOpen.value = false
+}
+
+function moveHighlight(delta: number) {
+  if (!isRecipeListOpen.value) {
+    isRecipeListOpen.value = true
+    return
+  }
+
+  const maxIndex = filteredRecipes.value.length - 1
+  if (maxIndex < 0) return
+
+  highlightedIndex.value = Math.min(maxIndex, Math.max(0, highlightedIndex.value + delta))
+}
+
+function selectHighlighted() {
+  const recipe = filteredRecipes.value[highlightedIndex.value]
+  if (recipe) selectRecipe(recipe)
+}
+
 const memberSelection = reactive<Record<number, { checked: boolean; multiplier: number }>>(
   Object.fromEntries(
     props.familyMembers.map((member) => {
@@ -50,11 +104,6 @@ const memberSelection = reactive<Record<number, { checked: boolean; multiplier: 
     }),
   ),
 )
-
-function onRecipeChange() {
-  const recipe = props.recipes.find((r) => r.id === selectedRecipeId.value)
-  plannedServings.value = recipe?.servings ?? null
-}
 
 async function handleSubmit() {
   if (!selectedRecipeId.value) {
@@ -106,15 +155,46 @@ async function handleSubmit() {
         >{{ MEAL_TYPE_LABELS[mealType] }} · {{ weekdayLabel(date) }}, {{ formatShortDate(date) }}
       </h2>
 
+      <RouterLink
+        v-if="selectedRecipeId"
+        :to="{ name: 'recipe-detail', params: { id: selectedRecipeId } }"
+        class="recipe-view-link"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        📖 Rezept ansehen
+      </RouterLink>
+
       <form @submit.prevent="handleSubmit">
         <label>
           Rezept
-          <select v-model.number="selectedRecipeId" required @change="onRecipeChange">
-            <option :value="null" disabled>Bitte wählen…</option>
-            <option v-for="recipe in recipes" :key="recipe.id" :value="recipe.id">
-              {{ recipe.title }}
-            </option>
-          </select>
+          <div class="combobox">
+            <input
+              v-model="recipeSearch"
+              type="text"
+              placeholder="Rezept suchen…"
+              autocomplete="off"
+              @focus="openRecipeList"
+              @blur="closeRecipeListDelayed"
+              @keydown.down.prevent="moveHighlight(1)"
+              @keydown.up.prevent="moveHighlight(-1)"
+              @keydown.enter.prevent="selectHighlighted"
+              @keydown.esc="isRecipeListOpen = false"
+            />
+            <ul v-if="isRecipeListOpen" class="combobox-list">
+              <li
+                v-for="(recipe, index) in filteredRecipes"
+                :key="recipe.id"
+                :class="{ highlighted: index === highlightedIndex, selected: recipe.id === selectedRecipeId }"
+                @mousedown.prevent="selectRecipe(recipe)"
+              >
+                {{ recipe.title }}
+              </li>
+              <li v-if="filteredRecipes.length === 0" class="combobox-empty">
+                Keine Rezepte gefunden.
+              </li>
+            </ul>
+          </div>
         </label>
 
         <label>
@@ -196,6 +276,29 @@ h2 {
   font-size: 1.1rem;
 }
 
+.recipe-view-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  padding: 0.65rem 1rem;
+  min-height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-background-soft);
+  color: var(--color-accent);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.recipe-view-link:hover,
+.recipe-view-link:focus-visible {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-sm);
+}
+
 form {
   display: flex;
   flex-direction: column;
@@ -209,7 +312,7 @@ label {
   font-size: 0.9rem;
 }
 
-select,
+input[type='text'],
 input[type='number'] {
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--color-border);
@@ -217,6 +320,54 @@ input[type='number'] {
   background: var(--color-background-soft);
   color: var(--color-text);
   font-size: 1rem;
+  width: 100%;
+}
+
+.combobox {
+  position: relative;
+}
+
+.combobox-list {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+}
+
+.combobox-list li {
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.combobox-list li.highlighted,
+.combobox-list li:hover {
+  background: var(--color-background-soft);
+}
+
+.combobox-list li.selected {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.combobox-empty {
+  opacity: 0.7;
+  cursor: default !important;
+}
+
+.combobox-empty:hover {
+  background: none !important;
 }
 
 fieldset {

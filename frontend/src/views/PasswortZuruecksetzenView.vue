@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { extractErrorMessage } from '@/lib/api'
 
-const auth = useAuthStore()
+const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 
-const email = ref('')
+const token = (route.query.token as string) ?? ''
+const email = ref((route.query.email as string) ?? '')
 const password = ref('')
+const passwordConfirmation = ref('')
 const errorMessage = ref('')
 const isSubmitting = ref(false)
 
@@ -17,8 +20,13 @@ async function handleSubmit() {
   isSubmitting.value = true
 
   try {
-    await auth.login(email.value, password.value)
-    await router.push({ name: 'wochenplan' })
+    await auth.resetPassword({
+      token,
+      email: email.value,
+      password: password.value,
+      password_confirmation: passwordConfirmation.value,
+    })
+    await router.push({ name: 'login' })
   } catch (error) {
     errorMessage.value = extractErrorMessage(error)
   } finally {
@@ -29,31 +37,43 @@ async function handleSubmit() {
 
 <template>
   <main class="auth-form">
-    <h1>Anmelden</h1>
+    <h1>Neues Passwort</h1>
 
-    <form @submit.prevent="handleSubmit">
+    <p v-if="!token" class="error">
+      Dieser Link ist unvollständig. Bitte fordere über
+      <RouterLink to="/passwort-vergessen">Passwort vergessen</RouterLink> einen neuen Link an.
+    </p>
+
+    <form v-else @submit.prevent="handleSubmit">
       <label>
         E-Mail
         <input v-model="email" type="email" required autocomplete="username" />
       </label>
 
       <label>
-        Passwort
-        <input v-model="password" type="password" required autocomplete="current-password" />
+        Neues Passwort
+        <input v-model="password" type="password" required autocomplete="new-password" />
+      </label>
+
+      <label>
+        Neues Passwort bestätigen
+        <input
+          v-model="passwordConfirmation"
+          type="password"
+          required
+          autocomplete="new-password"
+        />
       </label>
 
       <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
       <button type="submit" :disabled="isSubmitting">
-        {{ isSubmitting ? 'Wird angemeldet…' : 'Anmelden' }}
+        {{ isSubmitting ? 'Wird gespeichert…' : 'Passwort ändern' }}
       </button>
     </form>
 
     <p class="switch">
-      <RouterLink to="/passwort-vergessen">Passwort vergessen?</RouterLink>
-    </p>
-    <p class="switch">
-      Noch keinen Account? <RouterLink to="/register">Registrieren</RouterLink>
+      <RouterLink to="/login">Zurück zur Anmeldung</RouterLink>
     </p>
   </main>
 </template>
@@ -113,6 +133,7 @@ button:disabled {
 .error {
   color: #e0554f;
   font-size: 0.9rem;
+  line-height: 1.5;
 }
 
 .switch {
