@@ -37,6 +37,7 @@ class MealPlanConstraintExtractor
      *     max_prep_minutes: int|null,
      *     dietary_requirement: DietType|null,
      *     day_overrides: list<array{weekday: string, cuisines_prefer: list<string>, protein_source_prefer: list<string>, max_prep_minutes: int|null}>,
+     *     plan_days: int|null,
      *     notes: string|null,
      * }
      */
@@ -52,6 +53,7 @@ class MealPlanConstraintExtractor
                 'max_prep_minutes' => null,
                 'dietary_requirement' => null,
                 'day_overrides' => [],
+                'plan_days' => null,
                 'notes' => null,
             ];
         }
@@ -92,6 +94,7 @@ class MealPlanConstraintExtractor
                         ),
                         'max_prep_minutes' => $override['max_prep_minutes'] ?? null,
                     ], $data['day_overrides'] ?? []),
+                    'plan_days' => $data['plan_days'] ?? null,
                     'notes' => $data['notes'] ?? null,
                 ];
             }
@@ -123,6 +126,9 @@ class MealPlanConstraintExtractor
               - protein_source_prefer: Proteinquelle(n) nur für diesen Tag (z. B. "Fisch" →
                 fisch_meeresfruechte), sonst leer
               - max_prep_minutes: Zeitobergrenze nur für diesen Tag, sonst null
+            - plan_days: nur setzen, wenn explizit eine Anzahl an Tagen genannt wird, für die überhaupt
+              geplant werden soll (z. B. "nur für zwei Tage", "für die nächsten 3 Tage" → 3) — NICHT zu
+              verwechseln mit max_prep_minutes (das ist eine Zeitobergrenze pro Gericht). Sonst null.
             - notes: kurzer Rest-Kontext, der sich nicht in die obigen Felder einordnen lässt, sonst null.
             PROMPT;
     }
@@ -162,6 +168,7 @@ class MealPlanConstraintExtractor
                         'additionalProperties' => false,
                     ],
                 ],
+                'plan_days' => ['type' => ['integer', 'null']],
                 'notes' => ['type' => ['string', 'null']],
             ],
             'required' => [
@@ -171,6 +178,7 @@ class MealPlanConstraintExtractor
                 'max_prep_minutes',
                 'dietary_requirement',
                 'day_overrides',
+                'plan_days',
                 'notes',
             ],
             'additionalProperties' => false,

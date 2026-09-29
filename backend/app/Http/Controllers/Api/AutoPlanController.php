@@ -33,6 +33,12 @@ class AutoPlanController extends Controller
         [$start, $end] = $this->resolveDateRange($request);
 
         $recipes = Recipe::where('household_id', $householdId)
+            // A recipe with no ingredients can't be shopped for or cooked, and
+            // (having no ingredient list to classify from) is also always
+            // missing category/base/protein_source — it would otherwise slip
+            // past every content-based filter below. Never an auto-plan
+            // candidate; still editable/plannable manually.
+            ->whereHas('ingredients')
             ->with('ingredients:id,name')
             ->get([
                 'id', 'title', 'cuisine', 'category', 'diet_type', 'base', 'protein_source',
@@ -73,6 +79,19 @@ class AutoPlanController extends Controller
 
         $constraints = $constraintExtractor->extract($validated['criteria'] ?? null);
 
+        // Sorted by date so each slot's pick is influenced by the ones already
+        // made for earlier days in this same run (weekly variety context) —
+        // and so "plan_days" below keeps the chronologically first days.
+        usort($emptySlots, fn ($a, $b) => $a['date'] <=> $b['date']);
+
+        if (! empty($constraints['plan_days'])) {
+            $allowedDates = collect($emptySlots)->pluck('date')->unique()->take($constraints['plan_days'])->all();
+            $emptySlots = array_values(array_filter(
+                $emptySlots,
+                fn ($slot) => in_array($slot['date'], $allowedDates, true)
+            ));
+        }
+
         $history = MealPlan::where('household_id', $householdId)
             ->where('date', '>=', $start->copy()->subWeeks((int) config('mealplanner.cooldown_weeks', 3))->toDateString())
             ->where('date', '<', $start->toDateString())
@@ -98,10 +117,6 @@ class AutoPlanController extends Controller
             'cook_time_minutes' => $recipe->cook_time_minutes,
             'ingredient_names' => $recipe->ingredients->pluck('name')->all(),
         ])->all();
-
-        // Sorted by date so each slot's pick is influenced by the ones already
-        // made for earlier days in this same run (weekly variety context).
-        usort($emptySlots, fn ($a, $b) => $a['date'] <=> $b['date']);
 
         $assignments = [];
 

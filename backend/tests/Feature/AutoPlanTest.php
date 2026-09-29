@@ -2,6 +2,7 @@
 
 use App\Models\FamilyMember;
 use App\Models\Household;
+use App\Models\Ingredient;
 use App\Models\MealPlan;
 use App\Models\Recipe;
 use App\Models\User;
@@ -20,6 +21,17 @@ function autoPlanHousehold(): Household
     return $household;
 }
 
+// A recipe is only an auto-plan candidate once it has at least one
+// ingredient (see AutoPlanController::preview()'s whereHas('ingredients')),
+// so every test recipe that should actually be suggested needs one attached.
+function withIngredient(Recipe $recipe, string $name = 'Testzutat'): Recipe
+{
+    $ingredient = Ingredient::firstOrCreate(['name' => $name]);
+    $recipe->ingredients()->attach($ingredient->id, ['quantity' => 1, 'unit' => 'Stück']);
+
+    return $recipe;
+}
+
 function noConstraints(): array
 {
     return [
@@ -29,13 +41,14 @@ function noConstraints(): array
         'max_prep_minutes' => null,
         'dietary_requirement' => null,
         'day_overrides' => [],
+        'plan_days' => null,
         'notes' => null,
     ];
 }
 
 test('preview returns assignments for empty slots, enriched with recipe/member names', function () {
     $household = autoPlanHousehold();
-    $recipe = Recipe::factory()->for($household)->create(['title' => 'Pad Thai', 'cuisine' => 'thailändisch']);
+    $recipe = withIngredient(Recipe::factory()->for($household)->create(['title' => 'Pad Thai', 'cuisine' => 'thailändisch']));
     $member = FamilyMember::factory()->for($household)->create(['name' => 'Luisa']);
 
     $this->mock(MealPlanConstraintExtractor::class, function ($mock) {
@@ -66,9 +79,18 @@ test('rejects preview when the household has no recipes', function () {
     ])->assertStatus(422);
 });
 
+test('rejects preview when every recipe has no ingredients', function () {
+    $household = autoPlanHousehold();
+    Recipe::factory()->for($household)->create();
+
+    $this->postJson('/api/meal-plans/auto-plan?start_date=2026-07-20&end_date=2026-07-20', [
+        'meal_types' => ['dinner'],
+    ])->assertStatus(422);
+});
+
 test('returns no assignments and never calls the constraint extractor when all slots are already filled', function () {
     $household = autoPlanHousehold();
-    $recipe = Recipe::factory()->for($household)->create();
+    $recipe = withIngredient(Recipe::factory()->for($household)->create());
 
     MealPlan::factory()->for($household)->for($recipe)->create([
         'date' => '2026-07-20',
@@ -87,7 +109,7 @@ test('returns no assignments and never calls the constraint extractor when all s
 
 test('preview skips a slot entirely when every recipe is filtered out by a hard constraint', function () {
     $household = autoPlanHousehold();
-    Recipe::factory()->for($household)->create(['diet_type' => 'omnivore']);
+    withIngredient(Recipe::factory()->for($household)->create(['diet_type' => 'omnivore']));
     FamilyMember::factory()->for($household)->create();
 
     $this->mock(MealPlanConstraintExtractor::class, function ($mock) {
@@ -107,7 +129,7 @@ test('preview skips a slot entirely when every recipe is filtered out by a hard 
 
 test('preview never suggests a dessert for a breakfast slot, even when it is the only recipe', function () {
     $household = autoPlanHousehold();
-    Recipe::factory()->for($household)->create(['category' => 'dessert']);
+    withIngredient(Recipe::factory()->for($household)->create(['category' => 'dessert']));
     FamilyMember::factory()->for($household)->create();
 
     $this->mock(MealPlanConstraintExtractor::class, function ($mock) {
@@ -119,6 +141,31 @@ test('preview never suggests a dessert for a breakfast slot, even when it is the
     ]);
 
     $response->assertOk()->assertJson(['assignments' => []]);
+});
+
+test('plan_days limits the auto-plan to only the chronologically first N days of the range', function () {
+    $household = autoPlanHousehold();
+    withIngredient(Recipe::factory()->for($household)->create());
+    FamilyMember::factory()->for($household)->create();
+
+    $this->mock(MealPlanConstraintExtractor::class, function ($mock) {
+        $mock->shouldReceive('extract')->once()->andReturn([
+            ...noConstraints(),
+            'plan_days' => 2,
+        ]);
+    });
+
+    // A 5-day range, but plan_days should cap it to just the first two days.
+    $response = $this->postJson('/api/meal-plans/auto-plan?start_date=2026-07-20&end_date=2026-07-24', [
+        'meal_types' => ['dinner'],
+        'criteria' => 'nur für zwei Tage',
+    ]);
+
+    $response->assertOk();
+
+    $dates = collect($response->json('assignments'))->pluck('date')->all();
+
+    expect($dates)->toBe(['2026-07-20', '2026-07-21']);
 });
 
 test('apply creates meal plans for valid assignments and skips foreign-household IDs', function () {
