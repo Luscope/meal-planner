@@ -17,8 +17,14 @@ use Illuminate\Support\Carbon;
  * slots in the same run are influenced by earlier picks.
  *
  * Recipes are plain arrays (not Eloquent models) so this class — and its
- * tests — never need a database: {id, cuisine, diet_type, base,
+ * tests — never need a database: {id, cuisine, category, diet_type, base,
  * protein_source, prep_time_minutes, cook_time_minutes, ingredient_names}.
+ *
+ * `constraints.day_overrides` lets a criteria phrase like "freitags Fisch"
+ * or "montags schnell" pin a preference to one weekday (Carbon's English
+ * weekday name, lowercased, e.g. "friday"): {weekday, cuisines_prefer,
+ * protein_source_prefer, max_prep_minutes}. It's merged on top of the base
+ * constraints only while scoring the slot that falls on that weekday.
  */
 class RecipeScorer
 {
@@ -35,8 +41,17 @@ class RecipeScorer
     private array $runHistory;
 
     /**
+     * The constraints in effect for the slot currently being scored — the
+     * base constraints merged with any day_overrides entry matching that
+     * slot's weekday. Set at the top of each pick() call.
+     *
+     * @var array<string, mixed>
+     */
+    private array $activeConstraints;
+
+    /**
      * @param  list<array{recipe_id: int, date: string, rating: ?string}>  $history  Recent meal_plans rows for the household.
-     * @param  array{cuisines_prefer?: list<string>, cuisines_avoid?: list<string>, exclude_ingredients?: list<string>, max_prep_minutes?: int|null, dietary_requirement?: DietType|string|null, notes?: string|null}  $constraints
+     * @param  array{cuisines_prefer?: list<string>, cuisines_avoid?: list<string>, exclude_ingredients?: list<string>, max_prep_minutes?: int|null, dietary_requirement?: DietType|string|null, day_overrides?: list<array{weekday: string, cuisines_prefer?: list<string>, protein_source_prefer?: list<string>, max_prep_minutes?: int|null}>, notes?: string|null}  $constraints
      */
     public function __construct(
         array $history = [],
@@ -46,16 +61,18 @@ class RecipeScorer
     }
 
     /**
-     * Picks one recipe for the given slot date from the given candidates, or
-     * null if every candidate fails a hard filter. Updates the internal
-     * weekly context before returning.
+     * Picks one recipe for the given slot date/meal type from the given
+     * candidates, or null if every candidate fails a hard filter. Updates
+     * the internal weekly context before returning.
      *
      * @param  list<array<string, mixed>>  $recipes
      * @return array<string, mixed>|null
      */
-    public function pick(array $recipes, string $slotDate): ?array
+    public function pick(array $recipes, string $slotDate, ?string $mealType = null): ?array
     {
-        $candidates = $this->applyHardFilters($recipes);
+        $this->activeConstraints = $this->effectiveConstraintsFor($slotDate);
+
+        $candidates = $this->applyHardFilters($recipes, $mealType);
 
         if ($candidates === []) {
             return null;
@@ -79,10 +96,39 @@ class RecipeScorer
     }
 
     /**
+     * Merges the base constraints with any day_overrides entry whose
+     * weekday matches the given slot date.
+     *
+     * @return array<string, mixed>
+     */
+    private function effectiveConstraintsFor(string $slotDate): array
+    {
+        $base = $this->constraints;
+        $weekday = mb_strtolower(Carbon::parse($slotDate)->englishDayOfWeek);
+
+        $override = collect($base['day_overrides'] ?? [])
+            ->first(fn ($entry) => ($entry['weekday'] ?? null) === $weekday);
+
+        if ($override === null) {
+            return $base;
+        }
+
+        return [
+            ...$base,
+            'cuisines_prefer' => array_values(array_unique([
+                ...($base['cuisines_prefer'] ?? []),
+                ...($override['cuisines_prefer'] ?? []),
+            ])),
+            'protein_source_prefer' => array_values(array_unique($override['protein_source_prefer'] ?? [])),
+            'max_prep_minutes' => $override['max_prep_minutes'] ?? $base['max_prep_minutes'] ?? null,
+        ];
+    }
+
+    /**
      * @param  list<array<string, mixed>>  $recipes
      * @return list<array<string, mixed>>
      */
-    private function applyHardFilters(array $recipes): array
+    private function applyHardFilters(array $recipes, ?string $mealType): array
     {
         return array_values(array_filter(
             $recipes,
@@ -90,12 +136,30 @@ class RecipeScorer
                 && $this->passesIngredientExclusion($recipe)
                 && $this->passesPrepTimeLimit($recipe)
                 && $this->passesCuisineCap($recipe)
+                && $this->passesMealTypeCategory($recipe, $mealType)
         ));
+    }
+
+    private function passesMealTypeCategory(array $recipe, ?string $mealType): bool
+    {
+        if ($mealType === null) {
+            return true;
+        }
+
+        $category = $recipe['category'] ?? null;
+
+        if ($category === null) {
+            return true;
+        }
+
+        $excluded = config("mealplanner.excluded_categories_by_meal_type.{$mealType}", []);
+
+        return ! in_array($category, $excluded, true);
     }
 
     private function passesDietaryRequirement(array $recipe): bool
     {
-        $requirement = $this->constraints['dietary_requirement'] ?? null;
+        $requirement = $this->activeConstraints['dietary_requirement'] ?? null;
 
         if ($requirement === null) {
             return true;
@@ -121,7 +185,7 @@ class RecipeScorer
 
     private function passesIngredientExclusion(array $recipe): bool
     {
-        $excluded = $this->constraints['exclude_ingredients'] ?? [];
+        $excluded = $this->activeConstraints['exclude_ingredients'] ?? [];
 
         if ($excluded === []) {
             return true;
@@ -148,7 +212,7 @@ class RecipeScorer
 
     private function passesPrepTimeLimit(array $recipe): bool
     {
-        $max = $this->constraints['max_prep_minutes'] ?? null;
+        $max = $this->activeConstraints['max_prep_minutes'] ?? null;
 
         if ($max === null) {
             return true;
@@ -190,13 +254,20 @@ class RecipeScorer
         $cuisine = $recipe['cuisine'] ?? null;
 
         if ($cuisine !== null) {
-            if ($this->matchesAny($cuisine, $this->constraints['cuisines_prefer'] ?? [])) {
+            if ($this->matchesAny($cuisine, $this->activeConstraints['cuisines_prefer'] ?? [])) {
                 $score += $weights['cuisine_preferred'] ?? 0.0;
             }
 
-            if ($this->matchesAny($cuisine, $this->constraints['cuisines_avoid'] ?? [])) {
+            if ($this->matchesAny($cuisine, $this->activeConstraints['cuisines_avoid'] ?? [])) {
                 $score += $weights['cuisine_avoided'] ?? 0.0;
             }
+        }
+
+        if (
+            ! empty($recipe['protein_source'])
+            && in_array($recipe['protein_source'], $this->activeConstraints['protein_source_prefer'] ?? [], true)
+        ) {
+            $score += $weights['day_override_protein_match'] ?? 0.0;
         }
 
         if (! empty($recipe['base'])) {

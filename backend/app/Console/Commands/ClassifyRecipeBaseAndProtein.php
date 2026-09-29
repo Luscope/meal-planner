@@ -11,9 +11,9 @@ class ClassifyRecipeBaseAndProtein extends Command
 {
     protected $signature = 'recipes:classify-base-protein
         {--household= : Only classify recipes belonging to this household ID}
-        {--force : Re-classify recipes that already have a base/protein_source}';
+        {--force : Re-classify recipes that already have a category/base/protein_source}';
 
-    protected $description = 'Classify recipes (base ingredient + protein source) from their ingredients via Claude';
+    protected $description = 'Classify recipes (category + base ingredient + protein source) from their title/ingredients via Claude';
 
     public function handle(RecipeExtractor $extractor): int
     {
@@ -25,7 +25,7 @@ class ClassifyRecipeBaseAndProtein extends Command
 
         if (! $this->option('force')) {
             $query->where(function ($q) {
-                $q->whereNull('base')->orWhereNull('protein_source');
+                $q->whereNull('category')->orWhereNull('base')->orWhereNull('protein_source');
             });
         }
 
@@ -55,6 +55,7 @@ class ClassifyRecipeBaseAndProtein extends Command
             try {
                 $result = $extractor->classifyBaseAndProtein($recipe->title, $ingredientNames);
                 $recipe->update([
+                    'category' => $result['category'],
                     'base' => $result['base'],
                     'protein_source' => $result['protein_source'],
                 ]);

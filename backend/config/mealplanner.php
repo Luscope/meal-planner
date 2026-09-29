@@ -22,6 +22,16 @@ return [
     // How many top-scoring candidates to weighted-randomly pick from per slot.
     'candidate_pool_size' => 6,
 
+    // Hard filter: recipe categories that are never suggested for a given
+    // meal_type slot (e.g. a dessert is never picked as "the" dinner). A
+    // category not listed here is always allowed for that meal_type.
+    'excluded_categories_by_meal_type' => [
+        'breakfast' => ['dessert'],
+        'lunch' => ['dessert'],
+        'dinner' => ['dessert'],
+        'snack' => [],
+    ],
+
     // Soft-scoring weights. Higher magnitude = stronger influence on the score.
     'weights' => [
         // Multiplied by (weeks_since_last_used / cooldown_weeks), so a recipe
@@ -37,6 +47,12 @@ return [
         // Applied once per matching recipe already used this week for the same base/protein_source.
         'base_repetition' => -3.0,
         'protein_repetition' => -3.0,
+
+        // Strong bonus when a criteria day-override (e.g. "freitags Fisch")
+        // names this recipe's protein_source — deliberately much larger than
+        // cuisine_preferred so it reliably wins its specific slot, without
+        // being a hard filter that could leave the slot empty.
+        'day_override_protein_match' => 15.0,
 
         // Small random term (± this value) so ties don't always resolve the same way.
         'random_jitter' => 1.0,

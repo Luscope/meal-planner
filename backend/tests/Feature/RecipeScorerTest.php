@@ -20,6 +20,7 @@ function scorerRecipe(array $overrides = []): array
         'id' => 1,
         'title' => 'Test-Rezept',
         'cuisine' => null,
+        'category' => null,
         'diet_type' => null,
         'base' => null,
         'protein_source' => null,
@@ -108,4 +109,70 @@ test('excludes recipes over the max prep+cook time', function () {
     $picked = $scorer->pick([$slow, $fast], '2026-07-20');
 
     expect($picked['id'])->toBe(2);
+});
+
+test('excludes a recipe category not allowed for the given meal_type', function () {
+    $dessert = scorerRecipe(['id' => 1, 'category' => 'dessert']);
+    $mainCourse = scorerRecipe(['id' => 2, 'category' => 'main_course']);
+
+    $picked = (new RecipeScorer())->pick([$dessert, $mainCourse], '2026-07-20', 'dinner');
+
+    expect($picked['id'])->toBe(2);
+});
+
+test('a meal_type category exclusion does not apply to other meal types', function () {
+    $dessert = scorerRecipe(['id' => 1, 'category' => 'dessert']);
+
+    $picked = (new RecipeScorer())->pick([$dessert], '2026-07-20', 'snack');
+
+    expect($picked['id'])->toBe(1);
+});
+
+test('a day override gives a protein-source bonus only on its matching weekday', function () {
+    $fish = scorerRecipe(['id' => 1, 'protein_source' => 'fisch_meeresfruechte']);
+    $chicken = scorerRecipe(['id' => 2, 'protein_source' => 'huhn_gefluegel']);
+
+    $thursday = '2026-07-23';
+    $friday = '2026-07-24';
+    $fridayWeekday = mb_strtolower(\Illuminate\Support\Carbon::parse($friday)->englishDayOfWeek);
+
+    $scorer = new RecipeScorer([], [
+        'day_overrides' => [
+            ['weekday' => $fridayWeekday, 'cuisines_prefer' => [], 'protein_source_prefer' => ['fisch_meeresfruechte'], 'max_prep_minutes' => null],
+        ],
+    ]);
+
+    // Thursday: the override doesn't apply — both recipes tie, so the first
+    // given (chicken) wins deterministically (pool size 1, no jitter).
+    $thursdayPick = $scorer->pick([$chicken, $fish], $thursday);
+    expect($thursdayPick['id'])->toBe(2);
+
+    // Friday: the override's protein bonus makes the fish recipe win
+    // regardless of array order or the chicken pick's cooldown head start.
+    $fridayPick = $scorer->pick([$chicken, $fish], $friday);
+    expect($fridayPick['id'])->toBe(1);
+});
+
+test('a day override applies a prep-time limit only on its matching weekday', function () {
+    $slow = scorerRecipe(['id' => 1, 'prep_time_minutes' => 30, 'cook_time_minutes' => 30]);
+    $fast = scorerRecipe(['id' => 2, 'prep_time_minutes' => 5, 'cook_time_minutes' => 10]);
+
+    $monday = '2026-07-20';
+    $tuesday = '2026-07-21';
+    $mondayWeekday = mb_strtolower(\Illuminate\Support\Carbon::parse($monday)->englishDayOfWeek);
+
+    $scorer = new RecipeScorer([], [
+        'day_overrides' => [
+            ['weekday' => $mondayWeekday, 'cuisines_prefer' => [], 'protein_source_prefer' => [], 'max_prep_minutes' => 20],
+        ],
+    ]);
+
+    // Monday: the override's 20-minute cap excludes the slow recipe.
+    $mondayPick = $scorer->pick([$slow, $fast], $monday);
+    expect($mondayPick['id'])->toBe(2);
+
+    // Tuesday: no override applies (both eligible again), but the fast
+    // recipe was just used on Monday, so cooldown now favors the slow one.
+    $tuesdayPick = $scorer->pick([$slow, $fast], $tuesday);
+    expect($tuesdayPick['id'])->toBe(1);
 });

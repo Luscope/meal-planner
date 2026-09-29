@@ -13,6 +13,7 @@ use App\Services\MealPlanning\RecipeScorer;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -33,9 +34,15 @@ class AutoPlanController extends Controller
         [$start, $end] = $this->resolveDateRange($request);
 
         $recipes = Recipe::where('household_id', $householdId)
+            // A recipe with no ingredients can't be shopped for or cooked, and
+            // (having no ingredient list to classify from) is also always
+            // missing category/base/protein_source — it would otherwise slip
+            // past every content-based filter below. Never an auto-plan
+            // candidate; still editable/plannable manually.
+            ->whereHas('ingredients')
             ->with('ingredients:id,name')
             ->get([
-                'id', 'title', 'cuisine', 'diet_type', 'base', 'protein_source',
+                'id', 'title', 'cuisine', 'category', 'diet_type', 'base', 'protein_source',
                 'servings', 'prep_time_minutes', 'cook_time_minutes',
                 'calories_per_serving', 'protein_per_serving_g',
             ]);
@@ -73,6 +80,19 @@ class AutoPlanController extends Controller
 
         $constraints = $constraintExtractor->extract($validated['criteria'] ?? null);
 
+        // Sorted by date so each slot's pick is influenced by the ones already
+        // made for earlier days in this same run (weekly variety context) —
+        // and so "plan_days" below keeps the chronologically first days.
+        usort($emptySlots, fn ($a, $b) => $a['date'] <=> $b['date']);
+
+        if (! empty($constraints['plan_days'])) {
+            $allowedDates = collect($emptySlots)->pluck('date')->unique()->take($constraints['plan_days'])->all();
+            $emptySlots = array_values(array_filter(
+                $emptySlots,
+                fn ($slot) => in_array($slot['date'], $allowedDates, true)
+            ));
+        }
+
         $history = MealPlan::where('household_id', $householdId)
             ->where('date', '>=', $start->copy()->subWeeks((int) config('mealplanner.cooldown_weeks', 3))->toDateString())
             ->where('date', '<', $start->toDateString())
@@ -90,6 +110,7 @@ class AutoPlanController extends Controller
             'id' => $recipe->id,
             'title' => $recipe->title,
             'cuisine' => $recipe->cuisine,
+            'category' => $recipe->category?->value,
             'diet_type' => $recipe->diet_type?->value,
             'base' => $recipe->base?->value,
             'protein_source' => $recipe->protein_source?->value,
@@ -98,31 +119,88 @@ class AutoPlanController extends Controller
             'ingredient_names' => $recipe->ingredients->pluck('name')->all(),
         ])->all();
 
-        // Sorted by date so each slot's pick is influenced by the ones already
-        // made for earlier days in this same run (weekly variety context).
-        usort($emptySlots, fn ($a, $b) => $a['date'] <=> $b['date']);
+        $repeatDays = max(1, (int) ($constraints['repeat_days'] ?? 1));
+        $overrideWeekdays = collect($constraints['day_overrides'] ?? [])->pluck('weekday')->all();
 
         $assignments = [];
 
-        foreach ($emptySlots as $slot) {
-            $picked = $scorer->pick($recipeCandidates, $slot['date']);
+        // Batch-cook cadence applies per meal_type independently (e.g. lunch
+        // and dinner each get their own 2-day rhythm), never across types.
+        foreach (collect($emptySlots)->groupBy('meal_type') as $mealType => $slotsForType) {
+            $dates = $slotsForType->pluck('date')->all();
+            $groups = $this->groupDatesByRepeatCadence($dates, $repeatDays, $overrideWeekdays);
 
-            if ($picked === null) {
-                continue;
+            foreach ($groups as $group) {
+                // The group's first date is the reference for scoring (cooldown,
+                // and any day_override — a day with an override always forms
+                // its own single-date group, so this is exact, never approximate).
+                $picked = $scorer->pick($recipeCandidates, $group[0], $mealType);
+
+                if ($picked === null) {
+                    continue;
+                }
+
+                foreach ($group as $date) {
+                    $assignments[] = [
+                        'date' => $date,
+                        'meal_type' => $mealType,
+                        'recipe_id' => $picked['id'],
+                        'family_members' => collect($familyMembers)->map(fn ($member) => [
+                            'family_member_id' => $member['id'],
+                            'portion_multiplier' => 1.0,
+                        ])->all(),
+                    ];
+                }
             }
-
-            $assignments[] = [
-                'date' => $slot['date'],
-                'meal_type' => $slot['meal_type'],
-                'recipe_id' => $picked['id'],
-                'family_members' => collect($familyMembers)->map(fn ($member) => [
-                    'family_member_id' => $member['id'],
-                    'portion_multiplier' => 1.0,
-                ])->all(),
-            ];
         }
 
         return response()->json(['assignments' => $this->sanitizeAssignments($assignments, $recipeCandidates, $familyMembers)]);
+    }
+
+    /**
+     * Groups consecutive dates into batches of $repeatDays that will share
+     * one recipe (batch cooking) — except a date whose weekday has a
+     * criteria day_override, which always becomes its own single-date group
+     * (a pinned wish like "freitags Fisch" must never be diluted by being
+     * merged into a neighboring day's batch), and the cadence count then
+     * restarts cleanly on the following date.
+     *
+     * @param  list<string>  $dates  Sorted ascending, one meal_type's dates only.
+     * @param  list<string>  $overrideWeekdays  Lowercase English weekday names.
+     * @return list<list<string>>
+     */
+    private function groupDatesByRepeatCadence(array $dates, int $repeatDays, array $overrideWeekdays): array
+    {
+        $groups = [];
+        $current = [];
+
+        foreach ($dates as $date) {
+            $weekday = mb_strtolower(Carbon::parse($date)->englishDayOfWeek);
+
+            if (in_array($weekday, $overrideWeekdays, true)) {
+                if ($current !== []) {
+                    $groups[] = $current;
+                    $current = [];
+                }
+
+                $groups[] = [$date];
+
+                continue;
+            }
+
+            $current[] = $date;
+
+            if (count($current) >= $repeatDays) {
+                $groups[] = $current;
+                $current = [];
+            }
+        }
+
+        if ($current !== []) {
+            $groups[] = $current;
+        }
+
+        return $groups;
     }
 
     public function apply(Request $request): JsonResponse
