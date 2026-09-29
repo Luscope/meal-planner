@@ -8,7 +8,8 @@ use App\Http\Controllers\Controller;
 use App\Models\FamilyMember;
 use App\Models\MealPlan;
 use App\Models\Recipe;
-use App\Services\Claude\MealPlanSuggester;
+use App\Services\Claude\MealPlanConstraintExtractor;
+use App\Services\MealPlanning\RecipeScorer;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,7 +20,7 @@ class AutoPlanController extends Controller
 {
     use ResolvesDateRange;
 
-    public function preview(Request $request, MealPlanSuggester $suggester): JsonResponse
+    public function preview(Request $request, MealPlanConstraintExtractor $constraintExtractor): JsonResponse
     {
         $householdId = $request->user()->household_id;
 
@@ -32,10 +33,14 @@ class AutoPlanController extends Controller
         [$start, $end] = $this->resolveDateRange($request);
 
         $recipes = Recipe::where('household_id', $householdId)
-            ->get(['id', 'title', 'cuisine', 'servings', 'calories_per_serving', 'protein_per_serving_g'])
-            ->toArray();
+            ->with('ingredients:id,name')
+            ->get([
+                'id', 'title', 'cuisine', 'diet_type', 'base', 'protein_source',
+                'servings', 'prep_time_minutes', 'cook_time_minutes',
+                'calories_per_serving', 'protein_per_serving_g',
+            ]);
 
-        if (empty($recipes)) {
+        if ($recipes->isEmpty()) {
             throw ValidationException::withMessages([
                 'recipes' => 'Es sind noch keine Rezepte in der Datenbank, aus denen geplant werden könnte.',
             ]);
@@ -66,9 +71,58 @@ class AutoPlanController extends Controller
             return response()->json(['assignments' => []]);
         }
 
-        $assignments = $suggester->suggest($recipes, $familyMembers, $emptySlots, $validated['criteria'] ?? null);
+        $constraints = $constraintExtractor->extract($validated['criteria'] ?? null);
 
-        return response()->json(['assignments' => $this->sanitizeAssignments($assignments, $recipes, $familyMembers)]);
+        $history = MealPlan::where('household_id', $householdId)
+            ->where('date', '>=', $start->copy()->subWeeks((int) config('mealplanner.cooldown_weeks', 3))->toDateString())
+            ->where('date', '<', $start->toDateString())
+            ->get(['recipe_id', 'date', 'rating'])
+            ->map(fn ($plan) => [
+                'recipe_id' => $plan->recipe_id,
+                'date' => $plan->date->toDateString(),
+                'rating' => $plan->rating?->value,
+            ])
+            ->all();
+
+        $scorer = new RecipeScorer($history, $constraints);
+
+        $recipeCandidates = $recipes->map(fn (Recipe $recipe) => [
+            'id' => $recipe->id,
+            'title' => $recipe->title,
+            'cuisine' => $recipe->cuisine,
+            'diet_type' => $recipe->diet_type?->value,
+            'base' => $recipe->base?->value,
+            'protein_source' => $recipe->protein_source?->value,
+            'prep_time_minutes' => $recipe->prep_time_minutes,
+            'cook_time_minutes' => $recipe->cook_time_minutes,
+            'ingredient_names' => $recipe->ingredients->pluck('name')->all(),
+        ])->all();
+
+        // Sorted by date so each slot's pick is influenced by the ones already
+        // made for earlier days in this same run (weekly variety context).
+        usort($emptySlots, fn ($a, $b) => $a['date'] <=> $b['date']);
+
+        $assignments = [];
+
+        foreach ($emptySlots as $slot) {
+            $picked = $scorer->pick($recipeCandidates, $slot['date']);
+
+            if ($picked === null) {
+                continue;
+            }
+
+            $assignments[] = [
+                'date' => $slot['date'],
+                'meal_type' => $slot['meal_type'],
+                'recipe_id' => $picked['id'],
+                'family_members' => collect($familyMembers)->map(fn ($member) => [
+                    'family_member_id' => $member['id'],
+                    'portion_multiplier' => 1.0,
+                ])->all(),
+            ];
+        }
+
+        return response()->json(['assignments' => $this->sanitizeAssignments($assignments, $recipeCandidates, $familyMembers)]);
     }
 
     public function apply(Request $request): JsonResponse

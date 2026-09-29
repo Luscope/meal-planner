@@ -5,7 +5,7 @@ use App\Models\Household;
 use App\Models\MealPlan;
 use App\Models\Recipe;
 use App\Models\User;
-use App\Services\Claude\MealPlanSuggester;
+use App\Services\Claude\MealPlanConstraintExtractor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 
@@ -20,33 +20,29 @@ function autoPlanHousehold(): Household
     return $household;
 }
 
-test('preview returns sanitized suggestions for empty slots only', function () {
+function noConstraints(): array
+{
+    return [
+        'cuisines_prefer' => [],
+        'cuisines_avoid' => [],
+        'exclude_ingredients' => [],
+        'max_prep_minutes' => null,
+        'dietary_requirement' => null,
+        'notes' => null,
+    ];
+}
+
+test('preview returns assignments for empty slots, enriched with recipe/member names', function () {
     $household = autoPlanHousehold();
-    $recipe = Recipe::factory()->for($household)->create(['title' => 'Pad Thai']);
+    $recipe = Recipe::factory()->for($household)->create(['title' => 'Pad Thai', 'cuisine' => 'thailändisch']);
     $member = FamilyMember::factory()->for($household)->create(['name' => 'Luisa']);
 
-    $this->mock(MealPlanSuggester::class, function ($mock) use ($recipe, $member) {
-        $mock->shouldReceive('suggest')->once()->andReturn([
-            [
-                'date' => '2026-07-20',
-                'meal_type' => 'dinner',
-                'recipe_id' => $recipe->id,
-                'family_members' => [
-                    ['family_member_id' => $member->id, 'portion_multiplier' => 1.0],
-                    ['family_member_id' => 999999, 'portion_multiplier' => 1.0], // hallucinated
-                ],
-            ],
-            [
-                'date' => '2026-07-20',
-                'meal_type' => 'lunch',
-                'recipe_id' => 999999, // hallucinated recipe
-                'family_members' => [],
-            ],
-        ]);
+    $this->mock(MealPlanConstraintExtractor::class, function ($mock) {
+        $mock->shouldReceive('extract')->once()->andReturn(noConstraints());
     });
 
     $response = $this->postJson('/api/meal-plans/auto-plan?start_date=2026-07-20&end_date=2026-07-20', [
-        'meal_types' => ['dinner', 'lunch'],
+        'meal_types' => ['dinner'],
         'criteria' => 'wenig Fleisch',
     ]);
 
@@ -69,7 +65,7 @@ test('rejects preview when the household has no recipes', function () {
     ])->assertStatus(422);
 });
 
-test('returns no assignments and never calls the suggester when all slots are already filled', function () {
+test('returns no assignments and never calls the constraint extractor when all slots are already filled', function () {
     $household = autoPlanHousehold();
     $recipe = Recipe::factory()->for($household)->create();
 
@@ -78,11 +74,31 @@ test('returns no assignments and never calls the suggester when all slots are al
         'meal_type' => 'dinner',
     ]);
 
-    // No expectation set on the mock — Mockery fails the test if suggest() is called.
-    $this->mock(MealPlanSuggester::class);
+    // No expectation set on the mock — Mockery fails the test if extract() is called.
+    $this->mock(MealPlanConstraintExtractor::class);
 
     $response = $this->postJson('/api/meal-plans/auto-plan?start_date=2026-07-20&end_date=2026-07-20', [
         'meal_types' => ['dinner'],
+    ]);
+
+    $response->assertOk()->assertJson(['assignments' => []]);
+});
+
+test('preview skips a slot entirely when every recipe is filtered out by a hard constraint', function () {
+    $household = autoPlanHousehold();
+    Recipe::factory()->for($household)->create(['diet_type' => 'omnivore']);
+    FamilyMember::factory()->for($household)->create();
+
+    $this->mock(MealPlanConstraintExtractor::class, function ($mock) {
+        $mock->shouldReceive('extract')->once()->andReturn([
+            ...noConstraints(),
+            'dietary_requirement' => App\Enums\DietType::Vegan,
+        ]);
+    });
+
+    $response = $this->postJson('/api/meal-plans/auto-plan?start_date=2026-07-20&end_date=2026-07-20', [
+        'meal_types' => ['dinner'],
+        'criteria' => 'vegan bitte',
     ]);
 
     $response->assertOk()->assertJson(['assignments' => []]);

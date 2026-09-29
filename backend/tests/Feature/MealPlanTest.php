@@ -140,6 +140,30 @@ test('rejects updating a meal plan to a slot already taken by another entry', fu
     ])->assertStatus(422);
 });
 
+test('sets and clears a rating on a meal plan entry', function () {
+    [$household] = planningHousehold();
+    $recipe = Recipe::factory()->for($household)->create();
+    $mealPlan = MealPlan::factory()->for($household)->for($recipe)->create();
+
+    $response = $this->patchJson("/api/meal-plans/{$mealPlan->id}", ['rating' => 'liked']);
+
+    $response->assertOk()->assertJsonPath('data.rating', 'liked');
+    expect($mealPlan->fresh()->rating->value)->toBe('liked');
+
+    $response = $this->patchJson("/api/meal-plans/{$mealPlan->id}", ['rating' => null]);
+
+    $response->assertOk()->assertJsonPath('data.rating', null);
+    expect($mealPlan->fresh()->rating)->toBeNull();
+});
+
+test('rejects an invalid rating value', function () {
+    [$household] = planningHousehold();
+    $recipe = Recipe::factory()->for($household)->create();
+    $mealPlan = MealPlan::factory()->for($household)->for($recipe)->create();
+
+    $this->patchJson("/api/meal-plans/{$mealPlan->id}", ['rating' => 'meh'])->assertStatus(422);
+});
+
 test('deletes a meal plan scoped to the household', function () {
     [$household] = planningHousehold();
     $otherHousehold = Household::factory()->create();

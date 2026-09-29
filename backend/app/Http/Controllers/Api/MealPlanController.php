@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\MealRating;
 use App\Enums\MealType;
 use App\Http\Concerns\ResolvesDateRange;
 use App\Http\Controllers\Controller;
@@ -86,6 +87,7 @@ class MealPlanController extends Controller
             'date' => ['sometimes', 'date'],
             'meal_type' => ['sometimes', Rule::in(array_column(MealType::cases(), 'value'))],
             'planned_servings' => ['sometimes', 'numeric', 'min:0.5'],
+            'rating' => ['sometimes', 'nullable', Rule::in(array_column(MealRating::cases(), 'value'))],
             'family_members' => ['sometimes', 'array'],
             'family_members.*.family_member_id' => ['required_with:family_members', 'integer'],
             'family_members.*.portion_multiplier' => ['nullable', 'numeric', 'min:0.1'],
@@ -100,7 +102,7 @@ class MealPlanController extends Controller
         }
 
         try {
-            $mealPlan->update(Arr::only($validated, ['recipe_id', 'date', 'meal_type', 'planned_servings']));
+            $mealPlan->update(Arr::only($validated, ['recipe_id', 'date', 'meal_type', 'planned_servings', 'rating']));
         } catch (QueryException) {
             throw ValidationException::withMessages([
                 'meal_plan' => 'Dieses Rezept ist für diesen Tag und diese Mahlzeit bereits eingeplant.',
