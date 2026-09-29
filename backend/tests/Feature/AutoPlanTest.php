@@ -28,6 +28,7 @@ function noConstraints(): array
         'exclude_ingredients' => [],
         'max_prep_minutes' => null,
         'dietary_requirement' => null,
+        'day_overrides' => [],
         'notes' => null,
     ];
 }
@@ -99,6 +100,22 @@ test('preview skips a slot entirely when every recipe is filtered out by a hard 
     $response = $this->postJson('/api/meal-plans/auto-plan?start_date=2026-07-20&end_date=2026-07-20', [
         'meal_types' => ['dinner'],
         'criteria' => 'vegan bitte',
+    ]);
+
+    $response->assertOk()->assertJson(['assignments' => []]);
+});
+
+test('preview never suggests a dessert for a breakfast slot, even when it is the only recipe', function () {
+    $household = autoPlanHousehold();
+    Recipe::factory()->for($household)->create(['category' => 'dessert']);
+    FamilyMember::factory()->for($household)->create();
+
+    $this->mock(MealPlanConstraintExtractor::class, function ($mock) {
+        $mock->shouldReceive('extract')->once()->andReturn(noConstraints());
+    });
+
+    $response = $this->postJson('/api/meal-plans/auto-plan?start_date=2026-07-20&end_date=2026-07-20', [
+        'meal_types' => ['breakfast'],
     ]);
 
     $response->assertOk()->assertJson(['assignments' => []]);

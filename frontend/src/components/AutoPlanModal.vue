@@ -114,7 +114,7 @@ function backToForm() {
           <textarea
             v-model="criteria"
             rows="3"
-            placeholder="z. B. wenig Fleisch, viel Gemüse, montags schnell, Kinder mögen nichts Scharfes…"
+            placeholder="z. B. wenig Fleisch, viel Gemüse, montags schnell, freitags Fisch, Kinder mögen nichts Scharfes…"
           ></textarea>
         </label>
 

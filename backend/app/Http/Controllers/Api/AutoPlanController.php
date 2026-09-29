@@ -35,7 +35,7 @@ class AutoPlanController extends Controller
         $recipes = Recipe::where('household_id', $householdId)
             ->with('ingredients:id,name')
             ->get([
-                'id', 'title', 'cuisine', 'diet_type', 'base', 'protein_source',
+                'id', 'title', 'cuisine', 'category', 'diet_type', 'base', 'protein_source',
                 'servings', 'prep_time_minutes', 'cook_time_minutes',
                 'calories_per_serving', 'protein_per_serving_g',
             ]);
@@ -90,6 +90,7 @@ class AutoPlanController extends Controller
             'id' => $recipe->id,
             'title' => $recipe->title,
             'cuisine' => $recipe->cuisine,
+            'category' => $recipe->category?->value,
             'diet_type' => $recipe->diet_type?->value,
             'base' => $recipe->base?->value,
             'protein_source' => $recipe->protein_source?->value,
@@ -105,7 +106,7 @@ class AutoPlanController extends Controller
         $assignments = [];
 
         foreach ($emptySlots as $slot) {
-            $picked = $scorer->pick($recipeCandidates, $slot['date']);
+            $picked = $scorer->pick($recipeCandidates, $slot['date'], $slot['meal_type']);
 
             if ($picked === null) {
                 continue;

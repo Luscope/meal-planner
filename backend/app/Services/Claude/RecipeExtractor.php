@@ -113,13 +113,15 @@ class RecipeExtractor
     }
 
     /**
-     * Classifies an existing recipe's dominant base ingredient and protein
-     * source from its title and ingredient list alone. Same rationale as
-     * {@see classifyDietType()}: a cheap, focused judgment call over a short
-     * ingredient list rather than a full re-extraction.
+     * Classifies an existing recipe's category, dominant base ingredient and
+     * protein source from its title and ingredient list alone — in one call,
+     * so a backfill over many existing recipes doesn't need three separate
+     * API calls per recipe. Same rationale as {@see classifyDietType()}: a
+     * cheap, focused judgment call over a short ingredient list rather than
+     * a full re-extraction.
      *
      * @param  list<string>  $ingredientNames
-     * @return array{base: RecipeBase, protein_source: ProteinSource}
+     * @return array{category: RecipeCategory, base: RecipeBase, protein_source: ProteinSource}
      */
     public function classifyBaseAndProtein(string $title, array $ingredientNames): array
     {
@@ -141,6 +143,7 @@ class RecipeExtractor
                 $data = json_decode($block->text, associative: true, flags: JSON_THROW_ON_ERROR);
 
                 return [
+                    'category' => RecipeCategory::from($data['category']),
                     'base' => RecipeBase::from($data['base']),
                     'protein_source' => ProteinSource::from($data['protein_source']),
                 ];
@@ -155,8 +158,8 @@ class RecipeExtractor
         $ingredients = implode(', ', $ingredientNames);
 
         return "Recipe title: {$title}\nIngredients: {$ingredients}\n\n"
-            .'Classify the dominant base ingredient (carbohydrate component) and the dominant protein source of this '
-            .'dish, strictly from the literal ingredients list above.';
+            .'Classify the course/category, the dominant base ingredient (carbohydrate component), and the '
+            .'dominant protein source of this dish, strictly from the literal title and ingredients list above.';
     }
 
     private function baseAndProteinSchema(): array
@@ -164,6 +167,11 @@ class RecipeExtractor
         return [
             'type' => 'object',
             'properties' => [
+                'category' => [
+                    'type' => 'string',
+                    'enum' => array_column(RecipeCategory::cases(), 'value'),
+                    'description' => 'The best-fitting course/category for this dish: appetizer (Vorspeise), main_course (Hauptspeise), side_dish (Beilage), dessert (Dessert), snack (Snack), or drink (Getränk).',
+                ],
                 'base' => [
                     'type' => 'string',
                     'enum' => array_column(RecipeBase::cases(), 'value'),
@@ -175,7 +183,7 @@ class RecipeExtractor
                     'description' => 'The dominant protein source: huhn_gefluegel (chicken/poultry), rind (beef), schwein (pork), fisch_meeresfruechte (fish/seafood), tofu_seitan, huelsenfruechte (legumes/lentils/beans as protein), ei (egg as main protein), milchprodukte_kaese (dairy/cheese as main protein), or kein_hauptprotein (no significant protein source, e.g. a plain side dish or dessert).',
                 ],
             ],
-            'required' => ['base', 'protein_source'],
+            'required' => ['category', 'base', 'protein_source'],
             'additionalProperties' => false,
         ];
     }
