@@ -26,6 +26,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/recipe-imports/{recipeImport}', [RecipeImportController::class, 'show']);
 
     Route::get('/recipes/cuisines', [RecipeController::class, 'cuisines']);
+    Route::get('/recipes/units', [RecipeController::class, 'units']);
     Route::get('/recipes', [RecipeController::class, 'index']);
     Route::get('/recipes/{recipe}', [RecipeController::class, 'show']);
     Route::patch('/recipes/{recipe}', [RecipeController::class, 'update']);

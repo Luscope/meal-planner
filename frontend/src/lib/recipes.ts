@@ -104,6 +104,11 @@ export async function fetchCuisines(): Promise<string[]> {
   return response.data
 }
 
+export async function fetchUnits(): Promise<string[]> {
+  const response = await api.get('/recipes/units')
+  return response.data
+}
+
 export async function fetchRecipe(id: number | string): Promise<Recipe> {
   const response = await api.get(`/recipes/${id}`)
   return response.data.data

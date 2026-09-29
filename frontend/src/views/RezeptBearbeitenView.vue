@@ -5,7 +5,9 @@ import { extractErrorMessage } from '@/lib/api'
 import {
   DIET_TYPES,
   DIET_TYPE_LABELS,
+  fetchCuisines,
   fetchRecipe,
+  fetchUnits,
   RECIPE_CATEGORIES,
   RECIPE_CATEGORY_LABELS,
   updateRecipe,
@@ -40,6 +42,9 @@ interface IngredientRow {
 
 const ingredientRows = reactive<IngredientRow[]>([])
 
+const cuisines = ref<string[]>([])
+const units = ref<string[]>([])
+
 const isLoading = ref(false)
 const isSubmitting = ref(false)
 const errorMessage = ref('')
@@ -53,6 +58,25 @@ function removeIngredientRow(index: number) {
 }
 
 onMounted(async () => {
+  // Cuisine/unit suggestions are a nice-to-have for the datalists below;
+  // load them independently so a failure here never blocks the recipe from
+  // loading.
+  fetchCuisines()
+    .then((result) => {
+      cuisines.value = result
+    })
+    .catch(() => {
+      // Suggestions stay empty; the field still works as a plain text input.
+    })
+
+  fetchUnits()
+    .then((result) => {
+      units.value = result
+    })
+    .catch(() => {
+      // Suggestions stay empty; the field still works as a plain text input.
+    })
+
   isLoading.value = true
 
   try {
@@ -160,7 +184,10 @@ async function handleSubmit() {
 
       <label>
         Küche (optional)
-        <input v-model="cuisine" type="text" />
+        <input v-model="cuisine" type="text" list="cuisine-suggestions" autocomplete="off" />
+        <datalist id="cuisine-suggestions">
+          <option v-for="option in cuisines" :key="option" :value="option" />
+        </datalist>
       </label>
 
       <label>
@@ -229,13 +256,24 @@ async function handleSubmit() {
 
         <div v-for="(row, index) in ingredientRows" :key="index" class="ingredient-row">
           <input v-model="row.name" type="text" placeholder="Name" required />
-          <input v-model.number="row.quantity" type="number" min="0" step="0.1" placeholder="Menge" required />
-          <input v-model="row.unit" type="text" placeholder="Einheit" required />
+          <input v-model.number="row.quantity" type="number" min="0" step="0.01" placeholder="Menge" required />
+          <input
+            v-model="row.unit"
+            type="text"
+            placeholder="Einheit"
+            list="unit-suggestions"
+            autocomplete="off"
+            required
+          />
           <input v-model="row.notes" type="text" placeholder="Notiz (optional)" />
           <button type="button" class="remove" title="Entfernen" @click="removeIngredientRow(index)">
             ×
           </button>
         </div>
+
+        <datalist id="unit-suggestions">
+          <option v-for="option in units" :key="option" :value="option" />
+        </datalist>
 
         <button type="button" class="secondary add-row" @click="addIngredientRow">
           + Zutat hinzufügen
