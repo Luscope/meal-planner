@@ -13,6 +13,7 @@ use App\Services\MealPlanning\RecipeScorer;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -118,27 +119,88 @@ class AutoPlanController extends Controller
             'ingredient_names' => $recipe->ingredients->pluck('name')->all(),
         ])->all();
 
+        $repeatDays = max(1, (int) ($constraints['repeat_days'] ?? 1));
+        $overrideWeekdays = collect($constraints['day_overrides'] ?? [])->pluck('weekday')->all();
+
         $assignments = [];
 
-        foreach ($emptySlots as $slot) {
-            $picked = $scorer->pick($recipeCandidates, $slot['date'], $slot['meal_type']);
+        // Batch-cook cadence applies per meal_type independently (e.g. lunch
+        // and dinner each get their own 2-day rhythm), never across types.
+        foreach (collect($emptySlots)->groupBy('meal_type') as $mealType => $slotsForType) {
+            $dates = $slotsForType->pluck('date')->all();
+            $groups = $this->groupDatesByRepeatCadence($dates, $repeatDays, $overrideWeekdays);
 
-            if ($picked === null) {
-                continue;
+            foreach ($groups as $group) {
+                // The group's first date is the reference for scoring (cooldown,
+                // and any day_override — a day with an override always forms
+                // its own single-date group, so this is exact, never approximate).
+                $picked = $scorer->pick($recipeCandidates, $group[0], $mealType);
+
+                if ($picked === null) {
+                    continue;
+                }
+
+                foreach ($group as $date) {
+                    $assignments[] = [
+                        'date' => $date,
+                        'meal_type' => $mealType,
+                        'recipe_id' => $picked['id'],
+                        'family_members' => collect($familyMembers)->map(fn ($member) => [
+                            'family_member_id' => $member['id'],
+                            'portion_multiplier' => 1.0,
+                        ])->all(),
+                    ];
+                }
             }
-
-            $assignments[] = [
-                'date' => $slot['date'],
-                'meal_type' => $slot['meal_type'],
-                'recipe_id' => $picked['id'],
-                'family_members' => collect($familyMembers)->map(fn ($member) => [
-                    'family_member_id' => $member['id'],
-                    'portion_multiplier' => 1.0,
-                ])->all(),
-            ];
         }
 
         return response()->json(['assignments' => $this->sanitizeAssignments($assignments, $recipeCandidates, $familyMembers)]);
+    }
+
+    /**
+     * Groups consecutive dates into batches of $repeatDays that will share
+     * one recipe (batch cooking) — except a date whose weekday has a
+     * criteria day_override, which always becomes its own single-date group
+     * (a pinned wish like "freitags Fisch" must never be diluted by being
+     * merged into a neighboring day's batch), and the cadence count then
+     * restarts cleanly on the following date.
+     *
+     * @param  list<string>  $dates  Sorted ascending, one meal_type's dates only.
+     * @param  list<string>  $overrideWeekdays  Lowercase English weekday names.
+     * @return list<list<string>>
+     */
+    private function groupDatesByRepeatCadence(array $dates, int $repeatDays, array $overrideWeekdays): array
+    {
+        $groups = [];
+        $current = [];
+
+        foreach ($dates as $date) {
+            $weekday = mb_strtolower(Carbon::parse($date)->englishDayOfWeek);
+
+            if (in_array($weekday, $overrideWeekdays, true)) {
+                if ($current !== []) {
+                    $groups[] = $current;
+                    $current = [];
+                }
+
+                $groups[] = [$date];
+
+                continue;
+            }
+
+            $current[] = $date;
+
+            if (count($current) >= $repeatDays) {
+                $groups[] = $current;
+                $current = [];
+            }
+        }
+
+        if ($current !== []) {
+            $groups[] = $current;
+        }
+
+        return $groups;
     }
 
     public function apply(Request $request): JsonResponse

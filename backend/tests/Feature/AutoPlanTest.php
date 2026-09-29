@@ -42,6 +42,7 @@ function noConstraints(): array
         'dietary_requirement' => null,
         'day_overrides' => [],
         'plan_days' => null,
+        'repeat_days' => null,
         'notes' => null,
     ];
 }
@@ -166,6 +167,80 @@ test('plan_days limits the auto-plan to only the chronologically first N days of
     $dates = collect($response->json('assignments'))->pluck('date')->all();
 
     expect($dates)->toBe(['2026-07-20', '2026-07-21']);
+});
+
+test('repeat_days batches consecutive days of the same meal_type to share one recipe', function () {
+    $household = autoPlanHousehold();
+    withIngredient(Recipe::factory()->for($household)->create(['title' => 'Rezept A']));
+    withIngredient(Recipe::factory()->for($household)->create(['title' => 'Rezept B']));
+    FamilyMember::factory()->for($household)->create();
+
+    $this->mock(MealPlanConstraintExtractor::class, function ($mock) {
+        $mock->shouldReceive('extract')->once()->andReturn([
+            ...noConstraints(),
+            'repeat_days' => 2,
+        ]);
+    });
+
+    $response = $this->postJson('/api/meal-plans/auto-plan?start_date=2026-07-20&end_date=2026-07-23', [
+        'meal_types' => ['dinner'],
+        'criteria' => 'Gerichte für zwei Tage einplanen',
+    ]);
+
+    $response->assertOk();
+
+    $assignments = collect($response->json('assignments'))->keyBy('date');
+
+    expect($assignments)->toHaveCount(4)
+        ->and($assignments['2026-07-20']['recipe_id'])->toBe($assignments['2026-07-21']['recipe_id'])
+        ->and($assignments['2026-07-22']['recipe_id'])->toBe($assignments['2026-07-23']['recipe_id']);
+});
+
+test('a day_override forces its own single-day group, breaking the repeat_days batch there', function () {
+    config(['mealplanner.candidate_pool_size' => 1, 'mealplanner.weights.random_jitter' => 0]);
+
+    $household = autoPlanHousehold();
+    // A global cuisine preference for chicken's cuisine makes the non-override
+    // days deterministic (chicken always wins the Monday/Tuesday tie), so only
+    // Wednesday's much larger day_override protein bonus can flip the pick to fish.
+    $chicken = withIngredient(Recipe::factory()->for($household)->create(['protein_source' => 'huhn_gefluegel', 'cuisine' => 'deutsch']), 'Huhn');
+    $fish = withIngredient(Recipe::factory()->for($household)->create(['protein_source' => 'fisch_meeresfruechte', 'cuisine' => 'italienisch']), 'Fisch');
+    FamilyMember::factory()->for($household)->create();
+
+    // 2026-07-20 is a Monday; compute Wednesday's weekday name rather than
+    // hardcoding it, so the test stays correct regardless of the calendar.
+    $wednesday = '2026-07-22';
+    $weekday = mb_strtolower(\Illuminate\Support\Carbon::parse($wednesday)->englishDayOfWeek);
+
+    $this->mock(MealPlanConstraintExtractor::class, function ($mock) use ($weekday) {
+        $mock->shouldReceive('extract')->once()->andReturn([
+            ...noConstraints(),
+            'cuisines_prefer' => ['deutsch'],
+            'repeat_days' => 2,
+            'day_overrides' => [
+                ['weekday' => $weekday, 'cuisines_prefer' => [], 'protein_source_prefer' => ['fisch_meeresfruechte'], 'max_prep_minutes' => null],
+            ],
+        ]);
+    });
+
+    $response = $this->postJson('/api/meal-plans/auto-plan?start_date=2026-07-20&end_date=2026-07-23', [
+        'meal_types' => ['dinner'],
+        'criteria' => 'am liebsten deutsch, mittwochs Fisch, Gerichte für zwei Tage einplanen',
+    ]);
+
+    $response->assertOk();
+
+    $assignments = collect($response->json('assignments'))->keyBy('date');
+
+    expect($assignments)->toHaveCount(4)
+        // Monday+Tuesday form one batch, sharing the (cuisine-preferred) chicken recipe.
+        ->and($assignments['2026-07-20']['recipe_id'])->toBe($chicken->id)
+        ->and($assignments['2026-07-21']['recipe_id'])->toBe($chicken->id)
+        // Wednesday breaks out on its own and gets the fish recipe specifically.
+        ->and($assignments[$wednesday]['recipe_id'])->toBe($fish->id)
+        // Thursday starts a fresh single-day group of its own (cadence restarts
+        // after the override) and reverts to the cuisine-preferred chicken.
+        ->and($assignments['2026-07-23']['recipe_id'])->toBe($chicken->id);
 });
 
 test('apply creates meal plans for valid assignments and skips foreign-household IDs', function () {

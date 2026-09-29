@@ -38,6 +38,7 @@ class MealPlanConstraintExtractor
      *     dietary_requirement: DietType|null,
      *     day_overrides: list<array{weekday: string, cuisines_prefer: list<string>, protein_source_prefer: list<string>, max_prep_minutes: int|null}>,
      *     plan_days: int|null,
+     *     repeat_days: int|null,
      *     notes: string|null,
      * }
      */
@@ -54,6 +55,7 @@ class MealPlanConstraintExtractor
                 'dietary_requirement' => null,
                 'day_overrides' => [],
                 'plan_days' => null,
+                'repeat_days' => null,
                 'notes' => null,
             ];
         }
@@ -95,6 +97,7 @@ class MealPlanConstraintExtractor
                         'max_prep_minutes' => $override['max_prep_minutes'] ?? null,
                     ], $data['day_overrides'] ?? []),
                     'plan_days' => $data['plan_days'] ?? null,
+                    'repeat_days' => $data['repeat_days'] ?? null,
                     'notes' => $data['notes'] ?? null,
                 ];
             }
@@ -126,9 +129,17 @@ class MealPlanConstraintExtractor
               - protein_source_prefer: Proteinquelle(n) nur für diesen Tag (z. B. "Fisch" →
                 fisch_meeresfruechte), sonst leer
               - max_prep_minutes: Zeitobergrenze nur für diesen Tag, sonst null
-            - plan_days: nur setzen, wenn explizit eine Anzahl an Tagen genannt wird, für die überhaupt
-              geplant werden soll (z. B. "nur für zwei Tage", "für die nächsten 3 Tage" → 3) — NICHT zu
-              verwechseln mit max_prep_minutes (das ist eine Zeitobergrenze pro Gericht). Sonst null.
+            - plan_days: nur setzen, wenn explizit die GESAMTE Planungsdauer verkürzt werden soll — es soll
+              für WENIGER TAGE INSGESAMT geplant werden als der Zeitraum eigentlich hergibt (z. B. "nur für
+              die nächsten 2 Tage planen", "diese Woche reicht mir bis Dienstag" → 2). Sonst null.
+            - repeat_days: nur setzen, wenn explizit ein Rhythmus fürs Vorkochen/Batch-Cooking genannt wird
+              — wie viele aufeinanderfolgende Tage EIN Gericht vorhalten/wiederholt werden soll, bevor ein
+              neues gekocht wird, über den GESAMTEN Zeitraum hinweg (z. B. "Gerichte bitte für zwei Tage
+              einplanen", "immer zwei Tage dasselbe Essen", "alle drei Tage ein neues Gericht" → 2 bzw. 3;
+              "jeden Tag was anderes" → 1). Das ist etwas völlig anderes als plan_days: plan_days verkürzt
+              die Woche, repeat_days lässt jedes Gericht über mehrere Tage der vollen Woche hinweg gelten.
+              Im Zweifel (z. B. bei "für zwei Tage einplanen" ohne weiteren Kontext) ist repeat_days die
+              wahrscheinlichere Bedeutung, da plan_days seltener explizit gewünscht wird. Sonst null.
             - notes: kurzer Rest-Kontext, der sich nicht in die obigen Felder einordnen lässt, sonst null.
             PROMPT;
     }
@@ -169,6 +180,7 @@ class MealPlanConstraintExtractor
                     ],
                 ],
                 'plan_days' => ['type' => ['integer', 'null']],
+                'repeat_days' => ['type' => ['integer', 'null']],
                 'notes' => ['type' => ['string', 'null']],
             ],
             'required' => [
@@ -179,6 +191,7 @@ class MealPlanConstraintExtractor
                 'dietary_requirement',
                 'day_overrides',
                 'plan_days',
+                'repeat_days',
                 'notes',
             ],
             'additionalProperties' => false,
