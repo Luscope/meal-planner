@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\MealRating;
 use App\Enums\MealType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -18,6 +19,7 @@ class MealPlan extends Model
         'date',
         'meal_type',
         'planned_servings',
+        'rating',
     ];
 
     protected function casts(): array
@@ -26,6 +28,7 @@ class MealPlan extends Model
             'date' => 'date',
             'meal_type' => MealType::class,
             'planned_servings' => 'decimal:2',
+            'rating' => MealRating::class,
         ];
     }
 

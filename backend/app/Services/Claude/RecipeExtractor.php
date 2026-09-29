@@ -4,6 +4,8 @@ namespace App\Services\Claude;
 
 use Anthropic\Client;
 use App\Enums\DietType;
+use App\Enums\ProteinSource;
+use App\Enums\RecipeBase;
 use App\Enums\RecipeCategory;
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Support\Facades\Http;
@@ -108,6 +110,74 @@ class RecipeExtractor
         }
 
         throw new RuntimeException('Claude response contained no text block.');
+    }
+
+    /**
+     * Classifies an existing recipe's dominant base ingredient and protein
+     * source from its title and ingredient list alone. Same rationale as
+     * {@see classifyDietType()}: a cheap, focused judgment call over a short
+     * ingredient list rather than a full re-extraction.
+     *
+     * @param  list<string>  $ingredientNames
+     * @return array{base: RecipeBase, protein_source: ProteinSource}
+     */
+    public function classifyBaseAndProtein(string $title, array $ingredientNames): array
+    {
+        $response = $this->client->messages->create(
+            model: 'claude-sonnet-5',
+            maxTokens: 256,
+            messages: [
+                ['role' => 'user', 'content' => [
+                    ['type' => 'text', 'text' => $this->buildBaseAndProteinPrompt($title, $ingredientNames)],
+                ]],
+            ],
+            outputConfig: [
+                'format' => ['type' => 'json_schema', 'schema' => $this->baseAndProteinSchema()],
+            ],
+        );
+
+        foreach ($response->content as $block) {
+            if ($block->type === 'text') {
+                $data = json_decode($block->text, associative: true, flags: JSON_THROW_ON_ERROR);
+
+                return [
+                    'base' => RecipeBase::from($data['base']),
+                    'protein_source' => ProteinSource::from($data['protein_source']),
+                ];
+            }
+        }
+
+        throw new RuntimeException('Claude response contained no text block.');
+    }
+
+    private function buildBaseAndProteinPrompt(string $title, array $ingredientNames): string
+    {
+        $ingredients = implode(', ', $ingredientNames);
+
+        return "Recipe title: {$title}\nIngredients: {$ingredients}\n\n"
+            .'Classify the dominant base ingredient (carbohydrate component) and the dominant protein source of this '
+            .'dish, strictly from the literal ingredients list above.';
+    }
+
+    private function baseAndProteinSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'base' => [
+                    'type' => 'string',
+                    'enum' => array_column(RecipeBase::cases(), 'value'),
+                    'description' => 'The dominant carbohydrate/base component of the dish: pasta, reis (rice), kartoffeln (potatoes), huelsenfruechte (legumes/lentils/beans as the base), brot_gebaeck (bread/pastry-based), getreide_sonstiges (other grains, e.g. couscous, bulgur, quinoa), gemuese (vegetable-based with no starchy base), or sonstiges (none of the above fits, e.g. a pure protein dish or a soup).',
+                ],
+                'protein_source' => [
+                    'type' => 'string',
+                    'enum' => array_column(ProteinSource::cases(), 'value'),
+                    'description' => 'The dominant protein source: huhn_gefluegel (chicken/poultry), rind (beef), schwein (pork), fisch_meeresfruechte (fish/seafood), tofu_seitan, huelsenfruechte (legumes/lentils/beans as protein), ei (egg as main protein), milchprodukte_kaese (dairy/cheese as main protein), or kein_hauptprotein (no significant protein source, e.g. a plain side dish or dessert).',
+                ],
+            ],
+            'required' => ['base', 'protein_source'],
+            'additionalProperties' => false,
+        ];
     }
 
     private function buildDietTypePrompt(string $title, array $ingredientNames): string
@@ -225,6 +295,16 @@ class RecipeExtractor
                     'enum' => array_column(DietType::cases(), 'value'),
                     'description' => 'The most restrictive diet this dish qualifies for, based on its ingredients: vegan (no animal products at all, including dairy, eggs, honey), vegetarian (no meat or fish/seafood, but dairy/eggs/honey OK), pescetarian (no meat, but fish/seafood OK), or omnivore (contains meat or poultry). Judge from the actual ingredient list, not the dish name.',
                 ],
+                'base' => [
+                    'type' => 'string',
+                    'enum' => array_column(RecipeBase::cases(), 'value'),
+                    'description' => 'The dominant carbohydrate/base component of the dish: pasta, reis (rice), kartoffeln (potatoes), huelsenfruechte (legumes/lentils/beans as the base), brot_gebaeck (bread/pastry-based), getreide_sonstiges (other grains, e.g. couscous, bulgur, quinoa), gemuese (vegetable-based with no starchy base), or sonstiges (none of the above fits, e.g. a pure protein dish or a soup).',
+                ],
+                'protein_source' => [
+                    'type' => 'string',
+                    'enum' => array_column(ProteinSource::cases(), 'value'),
+                    'description' => 'The dominant protein source: huhn_gefluegel (chicken/poultry), rind (beef), schwein (pork), fisch_meeresfruechte (fish/seafood), tofu_seitan, huelsenfruechte (legumes/lentils/beans as protein), ei (egg as main protein), milchprodukte_kaese (dairy/cheese as main protein), or kein_hauptprotein (no significant protein source, e.g. a plain side dish or dessert).',
+                ],
                 'description' => ['type' => ['string', 'null']],
                 'servings' => ['type' => 'integer'],
                 'prep_time_minutes' => ['type' => ['integer', 'null']],
@@ -255,7 +335,7 @@ class RecipeExtractor
                     'minItems' => 1,
                 ],
             ],
-            'required' => ['title', 'category', 'diet_type', 'servings', 'instructions', 'ingredients'],
+            'required' => ['title', 'category', 'diet_type', 'base', 'protein_source', 'servings', 'instructions', 'ingredients'],
             'additionalProperties' => false,
         ];
     }

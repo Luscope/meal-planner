@@ -40,11 +40,14 @@ export interface MealPlanFamilyMemberAssignment {
   portion_multiplier: string
 }
 
+export type MealRating = 'liked' | 'disliked'
+
 export interface MealPlan {
   id: number
   date: string
   meal_type: MealType
   planned_servings: string
+  rating: MealRating | null
   recipe: MealPlanRecipe
   family_members: MealPlanFamilyMemberAssignment[]
 }
@@ -79,6 +82,7 @@ export interface CreateMealPlanPayload {
 export interface UpdateMealPlanPayload {
   recipe_id?: number
   planned_servings?: number
+  rating?: MealRating | null
   family_members?: Array<{ family_member_id: number; portion_multiplier?: number }>
 }
 

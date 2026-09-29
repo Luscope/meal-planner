@@ -19,6 +19,7 @@ class MealPlanResource extends JsonResource
             'date' => $this->date->toDateString(),
             'meal_type' => $this->meal_type,
             'planned_servings' => $this->planned_servings,
+            'rating' => $this->rating,
             'recipe' => $this->whenLoaded('recipe', fn () => [
                 'id' => $this->recipe->id,
                 'title' => $this->recipe->title,

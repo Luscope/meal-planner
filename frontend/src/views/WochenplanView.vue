@@ -12,8 +12,10 @@ import {
   fetchMealPlans,
   fetchRecipesForPicker,
   fetchSummary,
+  updateMealPlan,
   type FamilyMember,
   type MealPlan,
+  type MealRating,
   type MealType,
   type RecipePickerItem,
   type Summary,
@@ -148,6 +150,17 @@ async function handleDelete(id: number) {
   }
 }
 
+async function handleRate(entry: MealPlan, rating: MealRating) {
+  const nextRating = entry.rating === rating ? null : rating
+
+  try {
+    const updated = await updateMealPlan(entry.id, { rating: nextRating })
+    entry.rating = updated.rating
+  } catch (error) {
+    errorMessage.value = extractErrorMessage(error)
+  }
+}
+
 function isOverTarget(calories: number, target: number | null): boolean {
   return target !== null && calories > target
 }
@@ -225,6 +238,26 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
                 <div v-if="entry.family_members.length" class="chip-members">
                   {{ entry.family_members.map((member) => member.name).join(', ') }}
                 </div>
+                <div class="chip-rating">
+                  <button
+                    type="button"
+                    class="rate-button"
+                    :class="{ active: entry.rating === 'liked' }"
+                    title="Hat geschmeckt"
+                    @click.stop="handleRate(entry, 'liked')"
+                  >
+                    👍
+                  </button>
+                  <button
+                    type="button"
+                    class="rate-button"
+                    :class="{ active: entry.rating === 'disliked' }"
+                    title="Hat nicht geschmeckt"
+                    @click.stop="handleRate(entry, 'disliked')"
+                  >
+                    👎
+                  </button>
+                </div>
               </div>
               <button class="add-button" type="button" @click="openModal(day, mealType)">
                 + Mahlzeit
@@ -269,6 +302,26 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
             </div>
             <div v-if="entry.family_members.length" class="chip-members">
               {{ entry.family_members.map((member) => member.name).join(', ') }}
+            </div>
+            <div class="chip-rating">
+              <button
+                type="button"
+                class="rate-button"
+                :class="{ active: entry.rating === 'liked' }"
+                title="Hat geschmeckt"
+                @click.stop="handleRate(entry, 'liked')"
+              >
+                👍
+              </button>
+              <button
+                type="button"
+                class="rate-button"
+                :class="{ active: entry.rating === 'disliked' }"
+                title="Hat nicht geschmeckt"
+                @click.stop="handleRate(entry, 'disliked')"
+              >
+                👎
+              </button>
             </div>
           </div>
 
@@ -512,6 +565,33 @@ button.link:hover {
   opacity: 1;
   box-shadow: none;
   transform: scale(1.15);
+}
+
+.chip-rating {
+  display: flex;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+}
+
+.rate-button {
+  border: 1px solid transparent;
+  background: none;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.85rem;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  opacity: 0.5;
+}
+
+.rate-button:hover {
+  opacity: 1;
+  box-shadow: none;
+}
+
+.rate-button.active {
+  opacity: 1;
+  border-color: var(--color-accent);
+  background: var(--color-background);
 }
 
 .add-button {
