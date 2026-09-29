@@ -110,8 +110,10 @@ class MealPlanConstraintExtractor
                 'exclude_ingredients' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'max_prep_minutes' => ['type' => ['integer', 'null']],
                 'dietary_requirement' => [
-                    'type' => ['string', 'null'],
-                    'enum' => [...array_column(DietType::cases(), 'value'), null],
+                    'anyOf' => [
+                        ['type' => 'string', 'enum' => array_column(DietType::cases(), 'value')],
+                        ['type' => 'null'],
+                    ],
                 ],
                 'notes' => ['type' => ['string', 'null']],
             ],
