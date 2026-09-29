@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class RecipeController extends Controller
@@ -135,5 +136,19 @@ class RecipeController extends Controller
             ->pluck('cuisine');
 
         return response()->json($cuisines);
+    }
+
+    public function units(Request $request): JsonResponse
+    {
+        $units = DB::table('recipe_ingredient')
+            ->join('recipes', 'recipes.id', '=', 'recipe_ingredient.recipe_id')
+            ->where('recipes.household_id', $request->user()->household_id)
+            ->whereNotNull('recipe_ingredient.unit')
+            ->where('recipe_ingredient.unit', '!=', '')
+            ->distinct()
+            ->orderBy('recipe_ingredient.unit')
+            ->pluck('recipe_ingredient.unit');
+
+        return response()->json($units);
     }
 }

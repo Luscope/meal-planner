@@ -183,3 +183,29 @@ test('cuisines endpoint returns distinct cuisines for the household', function (
     $response->assertOk()
         ->assertJson(['deutsch', 'thailändisch']);
 });
+
+test('units endpoint returns distinct ingredient units for the household', function () {
+    [$household] = actingAsHouseholdUser();
+    $otherHousehold = Household::factory()->create();
+
+    $flour = Ingredient::factory()->create(['name' => 'Mehl']);
+    $milk = Ingredient::factory()->create(['name' => 'Milch']);
+    $salt = Ingredient::factory()->create(['name' => 'Salz']);
+
+    $ownRecipe = Recipe::factory()->for($household)->create();
+    $ownRecipe->ingredients()->attach([
+        $flour->id => ['quantity' => 200, 'unit' => 'g', 'notes' => null],
+        $milk->id => ['quantity' => 500, 'unit' => 'ml', 'notes' => null],
+        $salt->id => ['quantity' => 1, 'unit' => 'g', 'notes' => null],
+    ]);
+
+    $foreignRecipe = Recipe::factory()->for($otherHousehold)->create();
+    $foreignRecipe->ingredients()->attach([
+        $flour->id => ['quantity' => 100, 'unit' => 'Tasse', 'notes' => null],
+    ]);
+
+    $response = $this->getJson('/api/recipes/units');
+
+    $response->assertOk()
+        ->assertJson(['g', 'ml']);
+});
