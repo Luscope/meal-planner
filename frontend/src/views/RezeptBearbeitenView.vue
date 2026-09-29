@@ -256,7 +256,7 @@ async function handleSubmit() {
 
         <div v-for="(row, index) in ingredientRows" :key="index" class="ingredient-row">
           <input v-model="row.name" type="text" placeholder="Name" required />
-          <input v-model.number="row.quantity" type="number" min="0" step="0.1" placeholder="Menge" required />
+          <input v-model.number="row.quantity" type="number" min="0" step="0.01" placeholder="Menge" required />
           <input
             v-model="row.unit"
             type="text"
