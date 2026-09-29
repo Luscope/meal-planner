@@ -26,6 +26,12 @@ export const RECIPE_CATEGORY_LABELS: Record<RecipeCategory, string> = {
   drink: 'Getränk',
 }
 
+/**
+ * Sentinel filter value meaning "this field has no value assigned".
+ * Must match the backend's RecipeController::UNASSIGNED constant exactly.
+ */
+export const UNASSIGNED_FILTER = '__unassigned__'
+
 export type DietType = 'omnivore' | 'pescetarian' | 'vegetarian' | 'vegan'
 
 export const DIET_TYPES: DietType[] = ['omnivore', 'pescetarian', 'vegetarian', 'vegan']
@@ -68,8 +74,8 @@ export interface Recipe {
 
 export interface RecipeFilters {
   cuisine?: string
-  category?: RecipeCategory
-  diet_type?: DietType
+  category?: RecipeCategory | typeof UNASSIGNED_FILTER
+  diet_type?: DietType | typeof UNASSIGNED_FILTER
   search?: string
   min_calories?: number
   max_calories?: number

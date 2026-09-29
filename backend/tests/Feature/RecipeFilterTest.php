@@ -31,6 +31,19 @@ test('filters recipes by cuisine', function () {
         ->assertJsonPath('data.0.cuisine', 'vietnamesisch');
 });
 
+test('filters recipes with no cuisine assigned', function () {
+    [$household] = actingAsHouseholdUser();
+
+    Recipe::factory()->for($household)->create(['cuisine' => null, 'title' => 'Ohne Küche']);
+    Recipe::factory()->for($household)->create(['cuisine' => 'japanisch']);
+
+    $response = $this->getJson('/api/recipes?cuisine=__unassigned__');
+
+    $response->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.title', 'Ohne Küche');
+});
+
 test('filters recipes by calorie range', function () {
     [$household] = actingAsHouseholdUser();
 
@@ -90,6 +103,19 @@ test('rejects an invalid category filter value', function () {
         ->assertStatus(422);
 });
 
+test('filters recipes with no category assigned', function () {
+    [$household] = actingAsHouseholdUser();
+
+    Recipe::factory()->for($household)->create(['category' => null, 'title' => 'Ohne Kategorie']);
+    Recipe::factory()->for($household)->create(['category' => 'dessert']);
+
+    $response = $this->getJson('/api/recipes?category=__unassigned__');
+
+    $response->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.title', 'Ohne Kategorie');
+});
+
 test('filters recipes by diet type', function () {
     [$household] = actingAsHouseholdUser();
 
@@ -108,6 +134,19 @@ test('rejects an invalid diet_type filter value', function () {
 
     $this->getJson('/api/recipes?diet_type=not-a-real-diet')
         ->assertStatus(422);
+});
+
+test('filters recipes with no diet type assigned', function () {
+    [$household] = actingAsHouseholdUser();
+
+    Recipe::factory()->for($household)->create(['diet_type' => null, 'title' => 'Ohne Ernährungsform']);
+    Recipe::factory()->for($household)->create(['diet_type' => 'vegan']);
+
+    $response = $this->getJson('/api/recipes?diet_type=__unassigned__');
+
+    $response->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.title', 'Ohne Ernährungsform');
 });
 
 test('recipes are scoped to the requesting household', function () {

@@ -8,6 +8,7 @@ import {
   fetchRecipes,
   RECIPE_CATEGORIES,
   RECIPE_CATEGORY_LABELS,
+  UNASSIGNED_FILTER,
   type DietType,
   type PaginatedRecipes,
   type Recipe,
@@ -23,8 +24,8 @@ const page = ref(1)
 
 const filters = reactive({
   cuisine: '',
-  category: '' as RecipeCategory | '',
-  dietType: '' as DietType | '',
+  category: '' as RecipeCategory | typeof UNASSIGNED_FILTER | '',
+  dietType: '' as DietType | typeof UNASSIGNED_FILTER | '',
   search: '',
   minCalories: null as number | null,
   maxCalories: null as number | null,
@@ -114,6 +115,7 @@ onMounted(async () => {
         Küche
         <select v-model="filters.cuisine">
           <option value="">Alle</option>
+          <option :value="UNASSIGNED_FILTER">Ohne Zuordnung</option>
           <option v-for="cuisine in cuisines" :key="cuisine" :value="cuisine">{{ cuisine }}</option>
         </select>
       </label>
@@ -122,6 +124,7 @@ onMounted(async () => {
         Kategorie
         <select v-model="filters.category">
           <option value="">Alle</option>
+          <option :value="UNASSIGNED_FILTER">Ohne Zuordnung</option>
           <option v-for="category in RECIPE_CATEGORIES" :key="category" :value="category">
             {{ RECIPE_CATEGORY_LABELS[category] }}
           </option>
@@ -132,6 +135,7 @@ onMounted(async () => {
         Ernährungsform
         <select v-model="filters.dietType">
           <option value="">Alle</option>
+          <option :value="UNASSIGNED_FILTER">Ohne Zuordnung</option>
           <option v-for="dietType in DIET_TYPES" :key="dietType" :value="dietType">
             {{ DIET_TYPE_LABELS[dietType] }}
           </option>

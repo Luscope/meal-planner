@@ -16,12 +16,18 @@ use Illuminate\Validation\Rule;
 
 class RecipeController extends Controller
 {
+    /**
+     * Sentinel filter value meaning "this field has no value assigned".
+     * Must match the frontend's UNASSIGNED_FILTER constant exactly.
+     */
+    private const UNASSIGNED = '__unassigned__';
+
     public function index(Request $request): AnonymousResourceCollection
     {
         $validated = $request->validate([
             'cuisine' => ['nullable', 'string'],
-            'category' => ['nullable', Rule::in(array_column(RecipeCategory::cases(), 'value'))],
-            'diet_type' => ['nullable', Rule::in(array_column(DietType::cases(), 'value'))],
+            'category' => ['nullable', Rule::in([...array_column(RecipeCategory::cases(), 'value'), self::UNASSIGNED])],
+            'diet_type' => ['nullable', Rule::in([...array_column(DietType::cases(), 'value'), self::UNASSIGNED])],
             'search' => ['nullable', 'string'],
             'min_calories' => ['nullable', 'integer', 'min:0'],
             'max_calories' => ['nullable', 'integer', 'min:0'],
@@ -32,9 +38,15 @@ class RecipeController extends Controller
 
         $recipes = Recipe::query()
             ->where('household_id', $request->user()->household_id)
-            ->when($validated['cuisine'] ?? null, fn ($q, $cuisine) => $q->where('cuisine', 'like', "%{$cuisine}%"))
-            ->when($validated['category'] ?? null, fn ($q, $category) => $q->where('category', $category))
-            ->when($validated['diet_type'] ?? null, fn ($q, $dietType) => $q->where('diet_type', $dietType))
+            ->when($validated['cuisine'] ?? null, fn ($q, $cuisine) => $cuisine === self::UNASSIGNED
+                ? $q->whereNull('cuisine')
+                : $q->where('cuisine', 'like', "%{$cuisine}%"))
+            ->when($validated['category'] ?? null, fn ($q, $category) => $category === self::UNASSIGNED
+                ? $q->whereNull('category')
+                : $q->where('category', $category))
+            ->when($validated['diet_type'] ?? null, fn ($q, $dietType) => $dietType === self::UNASSIGNED
+                ? $q->whereNull('diet_type')
+                : $q->where('diet_type', $dietType))
             ->when($validated['search'] ?? null, fn ($q, $search) => $q->where('title', 'like', "%{$search}%"))
             ->when($validated['min_calories'] ?? null, fn ($q, $min) => $q->where('calories_per_serving', '>=', $min))
             ->when($validated['max_calories'] ?? null, fn ($q, $max) => $q->where('calories_per_serving', '<=', $max))
