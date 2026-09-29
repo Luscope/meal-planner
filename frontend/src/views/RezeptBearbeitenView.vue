@@ -5,6 +5,7 @@ import { extractErrorMessage } from '@/lib/api'
 import {
   DIET_TYPES,
   DIET_TYPE_LABELS,
+  fetchCuisines,
   fetchRecipe,
   RECIPE_CATEGORIES,
   RECIPE_CATEGORY_LABELS,
@@ -40,6 +41,8 @@ interface IngredientRow {
 
 const ingredientRows = reactive<IngredientRow[]>([])
 
+const cuisines = ref<string[]>([])
+
 const isLoading = ref(false)
 const isSubmitting = ref(false)
 const errorMessage = ref('')
@@ -53,6 +56,16 @@ function removeIngredientRow(index: number) {
 }
 
 onMounted(async () => {
+  // Cuisine suggestions are a nice-to-have for the datalist below; load them
+  // independently so a failure here never blocks the recipe from loading.
+  fetchCuisines()
+    .then((result) => {
+      cuisines.value = result
+    })
+    .catch(() => {
+      // Suggestions stay empty; the field still works as a plain text input.
+    })
+
   isLoading.value = true
 
   try {
@@ -160,7 +173,10 @@ async function handleSubmit() {
 
       <label>
         Küche (optional)
-        <input v-model="cuisine" type="text" />
+        <input v-model="cuisine" type="text" list="cuisine-suggestions" autocomplete="off" />
+        <datalist id="cuisine-suggestions">
+          <option v-for="option in cuisines" :key="option" :value="option" />
+        </datalist>
       </label>
 
       <label>
