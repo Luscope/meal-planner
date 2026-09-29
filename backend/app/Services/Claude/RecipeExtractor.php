@@ -22,6 +22,16 @@ class RecipeExtractor
         // interrupt a blocking curl call, which previously wedged the queue
         // worker until it was restarted manually. A pre-configured Guzzle
         // transporter enforces the timeout at the curl level instead.
+        //
+        // The SDK already retries 429/5xx responses on its own (including
+        // Anthropic's transient 503 "overloaded_error" — e.g. "Grammar
+        // compilation is temporarily unavailable" — which structured-output
+        // requests can hit), but its default of 2 retries with an 0.5s
+        // initial/8s max backoff gives up within a few seconds. That's too
+        // short to ride out a longer-lived overload incident, so a recipe
+        // import failed outright instead of quietly succeeding a bit later.
+        // Non-retryable errors (4xx like a malformed schema or bad request)
+        // are unaffected — the SDK's retry policy already excludes those.
         $this->client = new Client(
             apiKey: config('services.anthropic.key'),
             requestOptions: [
@@ -29,6 +39,9 @@ class RecipeExtractor
                     'connect_timeout' => 10,
                     'timeout' => 120,
                 ]),
+                'maxRetries' => 5,
+                'initialRetryDelay' => 2.0,
+                'maxRetryDelay' => 15.0,
             ],
         );
     }
