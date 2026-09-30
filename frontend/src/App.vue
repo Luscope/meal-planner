@@ -133,7 +133,9 @@ const auth = useAuthStore()
 /* At/above the sidebar breakpoint: fixed-width sidebar, no tab bar. */
 @media (min-width: 880px) {
   .sidebar-slot {
-    display: block;
+    /* flex (not block): stretches its child <aside> to the slot's full
+       height, which itself already stretches to the app-shell row's height. */
+    display: flex;
   }
 
   .app-shell.has-sidebar {
