@@ -1,19 +1,19 @@
 <script setup lang="ts">
-import { RouterLink, RouterView, useRouter } from 'vue-router'
+import { RouterLink, RouterView } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import SidebarNav from '@/components/layout/SidebarNav.vue'
+import BottomTabBar from '@/components/layout/BottomTabBar.vue'
 
 const auth = useAuthStore()
-const router = useRouter()
-
-async function handleLogout() {
-  await auth.logout()
-  await router.push({ name: 'login' })
-}
 </script>
 
 <template>
-  <div class="app-shell">
-    <header>
+  <div class="app-shell" :class="{ 'has-sidebar': auth.isAuthenticated }">
+    <div v-if="auth.isAuthenticated" class="sidebar-slot">
+      <SidebarNav />
+    </div>
+
+    <div v-else class="guest-header">
       <RouterLink to="/" class="brand">
         <svg class="brand-logo" viewBox="0 0 180.46083 211.67216" aria-hidden="true">
           <path
@@ -25,22 +25,18 @@ async function handleLogout() {
         <span>Essbar</span>
       </RouterLink>
 
-      <nav v-if="auth.isAuthenticated">
-        <RouterLink to="/">Wochenplan</RouterLink>
-        <RouterLink to="/rezepte">Rezepte</RouterLink>
-        <RouterLink to="/einkaufsliste">Einkaufsliste</RouterLink>
-        <RouterLink to="/haushalt">Haushalt</RouterLink>
-        <span class="user">{{ auth.user?.name }}</span>
-        <button type="button" @click="handleLogout">Abmelden</button>
-      </nav>
-      <nav v-else>
+      <nav aria-label="Konto" class="guest-nav">
         <RouterLink to="/login">Anmelden</RouterLink>
         <RouterLink to="/register">Registrieren</RouterLink>
       </nav>
-    </header>
+    </div>
 
     <div class="app-content">
       <RouterView />
+    </div>
+
+    <div v-if="auth.isAuthenticated" class="tabbar-slot">
+      <BottomTabBar />
     </div>
   </div>
 </template>
@@ -52,7 +48,14 @@ async function handleLogout() {
   min-height: 100vh;
 }
 
-header {
+.app-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.guest-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -62,73 +65,79 @@ header {
   border-bottom: 1px solid var(--color-border);
   position: sticky;
   top: 0;
-  background: var(--color-background);
+  background: var(--color-surface);
   box-shadow: var(--shadow-sm);
   z-index: 10;
-}
-
-.app-content {
-  flex: 1;
-  width: 100%;
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-weight: 700;
-  font-size: 1.1rem;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 1.15rem;
   color: var(--color-heading);
   text-decoration: none;
   white-space: nowrap;
 }
 
 .brand-logo {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 30px;
   flex-shrink: 0;
+  color: var(--color-accent);
 }
 
-nav {
+.guest-nav {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 1rem;
+  gap: 1.25rem;
   font-size: 0.9rem;
 }
 
-nav a {
+.guest-nav a {
   color: var(--color-text);
   text-decoration: none;
-  padding: 0.25rem 0.5rem;
-  margin: -0.25rem -0.5rem;
-  border-radius: 6px;
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--radius-sm);
 }
 
-nav a:hover {
+.guest-nav a:hover {
   color: var(--color-link);
   background: var(--color-link-hover-bg);
 }
 
-nav a.router-link-exact-active {
+.guest-nav a.router-link-exact-active {
   color: var(--color-link);
   font-weight: 600;
 }
 
-.user {
-  font-weight: 600;
+.sidebar-slot,
+.tabbar-slot {
+  display: none;
 }
 
-button {
-  padding: 0.4rem 0.8rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-background-soft);
-  color: var(--color-text);
-  cursor: pointer;
+/* Below the sidebar breakpoint: bottom tab bar, no sidebar. The tab bar is
+   fixed, so the content area needs matching bottom padding to stay clear of it. */
+@media (max-width: 879px) {
+  .tabbar-slot {
+    display: block;
+  }
+
+  .app-shell.has-sidebar .app-content {
+    padding-bottom: 84px;
+  }
 }
 
-button:hover {
-  box-shadow: var(--shadow-sm);
+/* At/above the sidebar breakpoint: fixed-width sidebar, no tab bar. */
+@media (min-width: 880px) {
+  .sidebar-slot {
+    display: block;
+  }
+
+  .app-shell.has-sidebar {
+    flex-direction: row;
+  }
 }
 </style>

@@ -1,56 +1,71 @@
-/* white / green / lilac palette, replacing the original gray Vue scaffold */
+/*
+ * "Essbar" design tokens — ivory/forest-green palette with a Fraunces
+ * (serif, headings) + DM Sans (body) pairing, ported from the "Essbar –
+ * Redesign" design canvas. See frontend/src/assets/theme.md if present,
+ * or the plan history, for the source token values.
+ *
+ * Dark mode has two paths that must both stay in sync with the same
+ * values: the `@media (prefers-color-scheme: dark)` block (OS default,
+ * "System" in the in-app switcher) and `:root[data-theme="dark"]`
+ * (explicit "Dunkel" choice, set/cleared by stores/theme.ts). The
+ * `:not([data-theme="light"])` guard on the media-query block stops the
+ * OS preference from fighting an explicit "Hell" choice.
+ */
 :root {
-  --vt-c-white: #ffffff;
-  --vt-c-mint-soft: #f0fff1;
-  --vt-c-mint-mute: #c2f8cb;
-  --vt-c-mint: #b3e9c7;
-  --vt-c-lilac: #8367c7;
-  --vt-c-purple: #5603ad;
+  --color-bg: #f6f4ee;
+  --color-surface: #ffffff;
+  --color-surface-2: #edeae2;
+  --color-text: #1b1a17;
+  --color-heading: #1b1a17;
+  --color-muted: #5c584f;
+  --color-border: #e0dbcf;
 
-  --vt-c-purple-black: #17131f;
-  --vt-c-purple-black-soft: #221c33;
-  --vt-c-purple-black-mute: #2b2140;
+  --color-accent: #2e6a4e;
+  --color-accent-hover: #255a41;
+  --color-on-accent: #ffffff;
 
-  --vt-c-divider-light-1: rgba(131, 103, 199, 0.35);
-  --vt-c-divider-light-2: rgba(140, 209, 142, 0.4);
-  --vt-c-divider-dark-1: rgba(131, 103, 199, 0.45);
-  --vt-c-divider-dark-2: rgba(179, 233, 199, 0.16);
+  --color-tint: #e1ece5;
+  --color-tint-text: #1f4a36;
+  --color-warn-bg: #f5e1c6;
+  --color-warn-text: #76410e;
+  --color-fish-bg: #dde7f0;
+  --color-fish-text: #23445e;
 
-  --vt-c-text-light-1: #14532d;
-  --vt-c-text-light-2: #2f6b46;
-  --vt-c-text-dark-1: #bdf5cd;
-  --vt-c-text-dark-2: rgba(189, 245, 205, 0.75);
-}
+  --color-link: var(--color-accent);
+  --color-link-hover-bg: var(--color-tint);
 
-/* semantic color variables for this project */
-:root {
-  --color-background: var(--vt-c-white);
-  --color-background-soft: var(--vt-c-mint-soft);
-  --color-background-mute: var(--vt-c-mint-mute);
+  /* Deprecated aliases kept during the redesign migration so any not-yet-
+     ported component still resolves to a sensible color instead of `unset`. */
+  --color-background: var(--color-bg);
+  --color-background-soft: var(--color-surface-2);
+  --color-background-mute: var(--color-surface-2);
+  --color-button-bg: var(--color-accent);
+  --color-button-text: var(--color-on-accent);
 
-  --color-border: var(--vt-c-divider-light-2);
-  --color-border-hover: var(--vt-c-divider-light-1);
+  --font-heading: 'Fraunces', Georgia, serif;
+  --font-body:
+    'DM Sans',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
 
-  --color-heading: var(--vt-c-text-light-1);
-  --color-text: var(--vt-c-text-light-2);
-
-  --color-accent: #248277;
-  --color-accent-hover: #036666;
-  --color-accent-light: #67b99a;
-
-  --color-link: #5603ad;
-  --color-link-hover-bg: #ba98f5;
-
-  --color-button-bg: #8cd18e;
-  --color-button-text: #f0fff1;
-
-  --radius-sm: 6px;
-  --radius-md: 10px;
+  --radius-xs: 8px;
+  --radius-sm: 10px;
+  --radius-md: 12px;
   --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.07);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.16), 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-sm:
+    0 1px 2px rgba(27, 26, 23, 0.06),
+    0 4px 12px rgba(27, 26, 23, 0.05);
+  --shadow-md:
+    0 1px 2px rgba(27, 26, 23, 0.06),
+    0 6px 20px rgba(27, 26, 23, 0.06);
+  --shadow-lg:
+    0 4px 12px rgba(27, 26, 23, 0.08),
+    0 16px 40px rgba(27, 26, 23, 0.1);
 
   --transition-fast: 0.15s ease;
 
@@ -58,21 +73,59 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: var(--vt-c-purple-black);
-    --color-background-soft: var(--vt-c-purple-black-soft);
-    --color-background-mute: var(--vt-c-purple-black-mute);
+  :root:not([data-theme='light']) {
+    --color-bg: #131411;
+    --color-surface: #1c1e1a;
+    --color-surface-2: #262923;
+    --color-text: #ecece3;
+    --color-heading: #ecece3;
+    --color-muted: #a5a297;
+    --color-border: #30332d;
 
-    --color-border: var(--vt-c-divider-dark-2);
-    --color-border-hover: var(--vt-c-divider-dark-1);
+    --color-accent: #86c7a5;
+    --color-accent-hover: #9ad4b5;
+    --color-on-accent: #0f2419;
 
-    --color-heading: var(--vt-c-text-dark-1);
-    --color-text: var(--vt-c-text-dark-2);
+    --color-tint: #1d3127;
+    --color-tint-text: #a9dcc0;
+    --color-warn-bg: #3a2c16;
+    --color-warn-text: #f0c98a;
+    --color-fish-bg: #1b2733;
+    --color-fish-text: #a8c8e4;
 
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.35);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.3);
-    --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-sm: 0 0 0 1px rgba(255, 255, 255, 0.03);
+    --shadow-md: 0 0 0 1px rgba(255, 255, 255, 0.03);
+    --shadow-lg:
+      0 0 0 1px rgba(255, 255, 255, 0.03),
+      0 16px 40px rgba(0, 0, 0, 0.4);
   }
+}
+
+:root[data-theme='dark'] {
+  --color-bg: #131411;
+  --color-surface: #1c1e1a;
+  --color-surface-2: #262923;
+  --color-text: #ecece3;
+  --color-heading: #ecece3;
+  --color-muted: #a5a297;
+  --color-border: #30332d;
+
+  --color-accent: #86c7a5;
+  --color-accent-hover: #9ad4b5;
+  --color-on-accent: #0f2419;
+
+  --color-tint: #1d3127;
+  --color-tint-text: #a9dcc0;
+  --color-warn-bg: #3a2c16;
+  --color-warn-text: #f0c98a;
+  --color-fish-bg: #1b2733;
+  --color-fish-text: #a8c8e4;
+
+  --shadow-sm: 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --shadow-md: 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --shadow-lg:
+    0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 16px 40px rgba(0, 0, 0, 0.4);
 }
 
 *,
@@ -86,28 +139,28 @@
 body {
   min-height: 100vh;
   color: var(--color-text);
-  background: var(--color-background);
+  background: var(--color-bg);
   transition:
-    color 0.5s,
-    background-color 0.5s;
+    color 0.3s,
+    background-color 0.3s;
   line-height: 1.6;
-  font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    'Fira Sans',
-    'Droid Sans',
-    'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-body);
   font-size: 15px;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-heading);
 }
 
 button,
@@ -124,6 +177,17 @@ textarea {
     opacity var(--transition-fast);
 }
 
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
@@ -131,5 +195,5 @@ select:focus-visible,
 textarea:focus-visible,
 [tabindex]:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-link) 35%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 35%, transparent);
 }
