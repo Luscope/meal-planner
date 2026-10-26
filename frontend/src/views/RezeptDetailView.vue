@@ -2,12 +2,19 @@
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { extractErrorMessage } from '@/lib/api'
-import { DIET_TYPE_LABELS, fetchRecipe, RECIPE_CATEGORY_LABELS, type Recipe } from '@/lib/recipes'
+import { DIET_TYPE_LABELS, fetchRecipe, RECIPE_CATEGORY_LABELS, type DietType, type Recipe } from '@/lib/recipes'
+import AppIcon from '@/components/AppIcon.vue'
 
 const route = useRoute()
 const recipe = ref<Recipe | null>(null)
 const errorMessage = ref('')
 const isLoading = ref(false)
+
+function dietBadgeClass(dietType: DietType): string {
+  if (dietType === 'pescetarian') return 'diet-badge diet-badge-fish'
+  if (dietType === 'vegan' || dietType === 'vegetarian') return 'diet-badge diet-badge-green'
+  return 'diet-badge diet-badge-neutral'
+}
 
 onMounted(async () => {
   isLoading.value = true
@@ -25,7 +32,10 @@ onMounted(async () => {
 <template>
   <main class="recipe-detail">
     <div class="top-row">
-      <RouterLink :to="{ name: 'recipes' }" class="back-link">← Zurück zu den Rezepten</RouterLink>
+      <RouterLink :to="{ name: 'recipes' }" class="back-link">
+        <AppIcon name="chevron-left" :size="16" />
+        Zurück zu den Rezepten
+      </RouterLink>
       <RouterLink
         v-if="recipe"
         :to="{ name: 'recipe-edit', params: { id: recipe.id } }"
@@ -39,11 +49,12 @@ onMounted(async () => {
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
     <template v-if="recipe">
+      <p v-if="recipe.cuisine || recipe.category" class="eyebrow">
+        {{ [recipe.cuisine, recipe.category && RECIPE_CATEGORY_LABELS[recipe.category]].filter(Boolean).join(' · ') }}
+      </p>
       <h1>{{ recipe.title }}</h1>
-      <div class="badges">
-        <p v-if="recipe.cuisine" class="cuisine-badge">{{ recipe.cuisine }}</p>
-        <p v-if="recipe.category" class="category-badge">{{ RECIPE_CATEGORY_LABELS[recipe.category] }}</p>
-        <p v-if="recipe.diet_type" class="diet-badge">{{ DIET_TYPE_LABELS[recipe.diet_type] }}</p>
+      <div v-if="recipe.diet_type" class="badges">
+        <span :class="dietBadgeClass(recipe.diet_type)">{{ DIET_TYPE_LABELS[recipe.diet_type] }}</span>
       </div>
       <p v-if="recipe.description" class="description">{{ recipe.description }}</p>
 
@@ -100,35 +111,40 @@ onMounted(async () => {
 
 <style scoped>
 .recipe-detail {
-  max-width: 700px;
+  max-width: 720px;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 2rem 1.5rem;
 }
 
 .top-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
 }
 
 .back-link {
-  color: var(--color-link);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--color-muted);
   text-decoration: none;
   font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .back-link:hover {
-  text-decoration: underline;
+  color: var(--color-text);
 }
 
 .edit-link {
   color: var(--color-text);
   text-decoration: none;
   font-size: 0.9rem;
+  font-weight: 500;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-md);
+  padding: 0.5rem 1rem;
 }
 
 .edit-link:hover {
@@ -142,49 +158,56 @@ onMounted(async () => {
 }
 
 .hint {
-  opacity: 0.7;
+  color: var(--color-muted);
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+h1 {
+  margin: 0.25rem 0 0;
+  font-size: 2rem;
 }
 
 .badges {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin: 0 0 1rem;
-}
-
-.cuisine-badge {
-  display: inline-block;
-  font-size: 0.8rem;
-  background: var(--color-background-soft);
-  border-radius: 999px;
-  padding: 0.2rem 0.7rem;
-  margin: 0;
-}
-
-.category-badge {
-  display: inline-block;
-  font-size: 0.8rem;
-  background: var(--color-accent-soft, var(--color-background-soft));
-  color: var(--color-accent, inherit);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  padding: 0.2rem 0.7rem;
-  margin: 0;
+  margin: 0.75rem 0 0;
 }
 
 .diet-badge {
   display: inline-block;
-  font-size: 0.8rem;
-  background: var(--color-background-soft);
-  color: var(--color-link);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  padding: 0.2rem 0.7rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-radius: var(--radius-pill);
+  padding: 0.25rem 0.75rem;
   margin: 0;
 }
 
+.diet-badge-green {
+  background: var(--color-tint);
+  color: var(--color-tint-text);
+}
+
+.diet-badge-fish {
+  background: var(--color-fish-bg);
+  color: var(--color-fish-text);
+}
+
+.diet-badge-neutral {
+  background: var(--color-surface-2);
+  color: var(--color-muted);
+}
+
 .description {
-  opacity: 0.85;
+  margin-top: 1rem;
+  color: var(--color-muted);
+  line-height: 1.6;
 }
 
 .meta-grid {
@@ -192,25 +215,36 @@ onMounted(async () => {
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 1rem;
   margin: 1.5rem 0;
-  padding: 1rem;
+  padding: 1.1rem;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
 }
 
 .meta-grid dt {
   font-size: 0.75rem;
-  opacity: 0.7;
+  color: var(--color-muted);
 }
 
 .meta-grid dd {
-  margin: 0;
+  margin: 0.15rem 0 0;
   font-weight: 600;
+}
+
+section {
+  margin-top: 1.75rem;
+}
+
+section h2 {
+  font-size: 1.15rem;
+  margin: 0 0 0.75rem;
 }
 
 .ingredient-list,
 .instructions {
+  margin: 0;
   padding-left: 1.25rem;
+  line-height: 1.7;
 }
 
 .ingredient-list li,
@@ -219,7 +253,7 @@ onMounted(async () => {
 }
 
 .notes {
-  opacity: 0.7;
+  color: var(--color-muted);
   font-size: 0.85rem;
 }
 </style>

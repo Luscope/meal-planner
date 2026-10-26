@@ -14,6 +14,7 @@ import {
   type DietType,
   type RecipeCategory,
 } from '@/lib/recipes'
+import AppIcon from '@/components/AppIcon.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -169,7 +170,8 @@ async function handleSubmit() {
 <template>
   <main class="recipe-edit">
     <RouterLink :to="{ name: 'recipe-detail', params: { id: recipeId } }" class="back-link">
-      ← Zurück zum Rezept
+      <AppIcon name="chevron-left" :size="16" />
+      Zurück zum Rezept
     </RouterLink>
 
     <h1>Rezept bearbeiten</h1>
@@ -267,7 +269,7 @@ async function handleSubmit() {
           />
           <input v-model="row.notes" type="text" placeholder="Notiz (optional)" />
           <button type="button" class="remove" title="Entfernen" @click="removeIngredientRow(index)">
-            ×
+            <AppIcon name="close" :size="15" />
           </button>
         </div>
 
@@ -276,7 +278,8 @@ async function handleSubmit() {
         </datalist>
 
         <button type="button" class="secondary add-row" @click="addIngredientRow">
-          + Zutat hinzufügen
+          <AppIcon name="plus" :size="15" />
+          Zutat hinzufügen
         </button>
       </fieldset>
 
@@ -296,25 +299,28 @@ async function handleSubmit() {
 
 <style scoped>
 .recipe-edit {
-  max-width: 700px;
+  max-width: 720px;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 2rem 1.5rem;
 }
 
 .back-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   margin-bottom: 1rem;
-  color: var(--color-link);
+  color: var(--color-muted);
   text-decoration: none;
   font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .back-link:hover {
-  text-decoration: underline;
+  color: var(--color-text);
 }
 
 .hint {
-  opacity: 0.7;
+  color: var(--color-muted);
 }
 
 form {
@@ -326,19 +332,21 @@ form {
 label {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.9rem;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-muted);
 }
 
 input,
 textarea,
 select {
-  padding: 0.5rem 0.6rem;
+  padding: 0.6rem 0.75rem;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-background-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
   color: var(--color-text);
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-family: inherit;
 }
 
@@ -354,7 +362,7 @@ textarea {
 
 fieldset {
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-lg);
   padding: 1rem;
   display: flex;
   flex-direction: column;
@@ -362,7 +370,9 @@ fieldset {
 }
 
 legend {
-  font-size: 0.9rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-muted);
   padding: 0 0.35rem;
 }
 
@@ -380,21 +390,24 @@ legend {
 .remove {
   border: none;
   background: none;
-  color: #e0554f;
-  font-size: 1.2rem;
+  color: var(--color-muted);
   cursor: pointer;
-  padding: 0 0.3rem;
-  opacity: 0.7;
+  padding: 0.3rem;
+  border-radius: 8px;
+  display: flex;
 }
 
 .remove:hover {
-  opacity: 1;
-  transform: scale(1.15);
+  color: #e0554f;
+  background: var(--color-surface-2);
   box-shadow: none;
 }
 
 .add-row {
   align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .error {
@@ -410,31 +423,36 @@ legend {
 }
 
 .secondary-link {
-  color: var(--color-text);
+  color: var(--color-muted);
   text-decoration: none;
   font-size: 0.9rem;
-  opacity: 0.8;
+  font-weight: 500;
 }
 
 button {
-  padding: 0.6rem 1.1rem;
+  height: 2.75rem;
+  padding: 0 1.1rem;
   border: none;
-  border-radius: var(--radius-sm);
-  background: var(--color-button-bg);
-  color: var(--color-button-text);
-  font-size: 0.95rem;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: 600;
+  font-size: 0.9375rem;
   cursor: pointer;
 }
 
 button:hover:not(:disabled) {
-  transform: translateY(-1px);
+  background: var(--color-accent-hover);
   box-shadow: var(--shadow-md);
 }
 
 button.secondary {
-  background: var(--color-background-soft);
+  height: auto;
+  background: var(--color-surface-2);
   color: var(--color-text);
   border: 1px solid var(--color-border);
+  font-weight: 500;
+  padding: 0.6rem 1rem;
 }
 
 button:disabled {

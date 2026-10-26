@@ -11,6 +11,7 @@ import {
   type RecipePickerItem,
 } from '@/lib/mealPlanner'
 import { formatShortDate, toIsoDate, weekdayLabel } from '@/lib/date'
+import AppIcon from '@/components/AppIcon.vue'
 
 const props = defineProps<{
   date: Date
@@ -162,7 +163,8 @@ async function handleSubmit() {
         target="_blank"
         rel="noopener noreferrer"
       >
-        📖 Rezept ansehen
+        <AppIcon name="book" :size="16" />
+        Rezept ansehen
       </RouterLink>
 
       <form @submit.prevent="handleSubmit">
@@ -247,8 +249,8 @@ async function handleSubmit() {
 }
 
 .modal {
-  background: var(--color-background);
-  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
   padding: 1.5rem;
   width: 100%;
@@ -285,8 +287,8 @@ h2 {
   padding: 0.65rem 1rem;
   min-height: 44px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-background-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
   color: var(--color-accent);
   font-weight: 600;
   font-size: 0.9rem;
@@ -314,12 +316,14 @@ label {
 
 input[type='text'],
 input[type='number'] {
-  padding: 0.5rem 0.6rem;
+  padding: 0.6rem 0.75rem;
+  min-height: 2.75rem;
+  box-sizing: border-box;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-background-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
   color: var(--color-text);
-  font-size: 1rem;
+  font-size: 0.9375rem;
   width: 100%;
 }
 
@@ -338,9 +342,9 @@ input[type='number'] {
   margin: 0;
   padding: 0.25rem;
   list-style: none;
-  background: var(--color-background);
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
 }
 
@@ -353,7 +357,7 @@ input[type='number'] {
 
 .combobox-list li.highlighted,
 .combobox-list li:hover {
-  background: var(--color-background-soft);
+  background: var(--color-surface-2);
 }
 
 .combobox-list li.selected {
@@ -372,7 +376,7 @@ input[type='number'] {
 
 fieldset {
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   padding: 0.75rem;
 }
 
@@ -411,22 +415,31 @@ legend {
 }
 
 button {
-  padding: 0.5rem 1rem;
+  height: 2.75rem;
+  padding: 0 1.1rem;
   border: none;
-  border-radius: var(--radius-sm);
-  background: var(--color-button-bg);
-  color: var(--color-button-text);
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: 600;
+  font-size: 0.9375rem;
   cursor: pointer;
 }
 
 button:hover:not(:disabled) {
+  background: var(--color-accent-hover);
   box-shadow: var(--shadow-md);
 }
 
 button.secondary {
-  background: var(--color-background-soft);
+  background: var(--color-surface-2);
   color: var(--color-text);
   border: 1px solid var(--color-border);
+  font-weight: 500;
+}
+
+button.secondary:hover:not(:disabled) {
+  background: var(--color-surface-2);
 }
 
 button.secondary:hover {

@@ -114,48 +114,60 @@ async function handleSubmit() {
 
 <style scoped>
 .auth-form {
-  max-width: 360px;
+  max-width: 380px;
   margin: 3rem auto;
-  padding: 2rem 1.75rem;
+  padding: 2.25rem 2rem;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
   box-shadow: var(--shadow-md);
+}
+
+h1 {
+  font-size: 1.85rem;
+  margin-bottom: 1.5rem;
 }
 
 form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.1rem;
 }
 
 label {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.9rem;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-muted);
 }
 
 input {
-  padding: 0.5rem 0.6rem;
+  height: 2.75rem;
+  box-sizing: border-box;
+  padding: 0 0.85rem;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-background-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
   color: var(--color-text);
-  font-size: 1rem;
+  font-size: 0.9375rem;
 }
 
 button {
-  padding: 0.6rem 1rem;
+  height: 2.75rem;
+  padding: 0 1rem;
   border: none;
-  border-radius: var(--radius-sm);
-  background: var(--color-button-bg);
-  color: var(--color-button-text);
-  font-size: 1rem;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: 0.9375rem;
+  font-weight: 600;
   cursor: pointer;
 }
 
 button:hover:not(:disabled) {
-  transform: translateY(-1px);
+  background: var(--color-accent-hover);
   box-shadow: var(--shadow-md);
 }
 
@@ -165,23 +177,35 @@ button:disabled {
 }
 
 .mode-toggle {
-  display: flex;
-  gap: 0.5rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
 }
 
 .mode-toggle button {
-  flex: 1;
-  background: var(--color-background-soft);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-  font-size: 0.85rem;
-  padding: 0.5rem;
+  height: 2.5rem;
+  background: transparent;
+  color: var(--color-muted);
+  border: none;
+  border-radius: 9px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.4rem;
+  white-space: normal;
 }
 
 .mode-toggle button.active {
-  background: var(--color-button-bg);
-  color: var(--color-button-text);
-  border-color: var(--color-button-bg);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+.mode-toggle button:hover:not(:disabled) {
+  box-shadow: none;
 }
 
 .invite-code-input {
@@ -190,7 +214,7 @@ button:disabled {
 
 .field-hint {
   font-size: 0.8rem;
-  opacity: 0.7;
+  color: var(--color-muted);
   font-weight: 400;
 }
 
