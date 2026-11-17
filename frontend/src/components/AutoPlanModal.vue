@@ -4,6 +4,7 @@ import { extractErrorMessage } from '@/lib/api'
 import { applyAutoPlan, previewAutoPlan, type AutoPlanAssignment } from '@/lib/autoPlan'
 import { formatShortDate, weekdayLabel } from '@/lib/date'
 import { MEAL_TYPES, MEAL_TYPE_LABELS, type MealType } from '@/lib/mealPlanner'
+import AppIcon from '@/components/AppIcon.vue'
 
 const props = defineProps<{
   startDate: string
@@ -101,7 +102,10 @@ function backToForm() {
 <template>
   <div class="overlay" @click.self="emit('close')">
     <div class="modal">
-      <h2>🤖 Woche automatisch planen</h2>
+      <h2>
+        <AppIcon name="auto-plan" :size="19" />
+        Woche automatisch planen
+      </h2>
 
       <template v-if="step === 'form'">
         <p class="hint">
@@ -199,8 +203,8 @@ function backToForm() {
 }
 
 .modal {
-  background: var(--color-background);
-  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
   padding: 1.5rem;
   width: 100%;
@@ -225,7 +229,10 @@ function backToForm() {
 
 h2 {
   margin-top: 0;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .hint {
@@ -243,19 +250,19 @@ label {
 }
 
 textarea {
-  padding: 0.5rem 0.6rem;
+  padding: 0.6rem 0.75rem;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-background-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
   color: var(--color-text);
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-family: inherit;
   resize: vertical;
 }
 
 fieldset {
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   padding: 0.75rem;
   margin-bottom: 1rem;
   display: flex;
@@ -299,7 +306,7 @@ legend {
 
 .suggestion-list li {
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   padding: 0.6rem 0.75rem;
   box-shadow: var(--shadow-sm);
 }
@@ -331,26 +338,31 @@ legend {
 }
 
 button {
-  padding: 0.5rem 1rem;
+  height: 2.75rem;
+  padding: 0 1.1rem;
   border: none;
-  border-radius: var(--radius-sm);
-  background: var(--color-button-bg);
-  color: var(--color-button-text);
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
   cursor: pointer;
-  font-size: 0.9rem;
+  font-weight: 600;
+  font-size: 0.9375rem;
 }
 
 button:hover:not(:disabled) {
+  background: var(--color-accent-hover);
   box-shadow: var(--shadow-md);
 }
 
 button.secondary {
-  background: var(--color-background-soft);
+  background: var(--color-surface-2);
   color: var(--color-text);
   border: 1px solid var(--color-border);
+  font-weight: 500;
 }
 
 button.secondary:hover:not(:disabled) {
+  background: var(--color-surface-2);
   box-shadow: var(--shadow-sm);
 }
 

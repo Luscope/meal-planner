@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import AddMealModal from '@/components/AddMealModal.vue'
 import AutoPlanModal from '@/components/AutoPlanModal.vue'
+import AppIcon from '@/components/AppIcon.vue'
 import { extractErrorMessage } from '@/lib/api'
 import { addDays, formatShortDate, startOfWeek, toIsoDate, weekRangeLabel, weekdayLabel } from '@/lib/date'
 import {
@@ -172,34 +173,40 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
 
 <template>
   <main class="wochenplan">
-    <div class="week-nav">
-      <button type="button" @click="previousWeek">← Vorherige Woche</button>
-      <div class="week-label">
-        <strong>{{ weekRangeLabel(weekStart) }}</strong>
-        <button type="button" class="link" @click="goToCurrentWeek">Heute</button>
+    <header class="page-header">
+      <div>
+        <div class="week-range">{{ weekRangeLabel(weekStart) }}</div>
+        <h1>Diese Woche</h1>
       </div>
-      <button type="button" @click="nextWeek">Nächste Woche →</button>
-      <button type="button" class="auto-plan-button" @click="isAutoPlanOpen = true">
-        🤖 Woche planen
-      </button>
-    </div>
 
-    <div class="view-toggle">
-      <button
-        type="button"
-        :class="{ active: viewMode === 'grid' }"
-        @click="setViewMode('grid')"
-      >
-        📅 Kalender
-      </button>
-      <button
-        type="button"
-        :class="{ active: viewMode === 'list' }"
-        @click="setViewMode('list')"
-      >
-        📋 Liste
-      </button>
-    </div>
+      <div class="header-actions">
+        <div class="mode-switch">
+          <button type="button" :class="{ active: viewMode === 'grid' }" @click="setViewMode('grid')">
+            <AppIcon name="calendar" :size="17" />
+            Kalender
+          </button>
+          <button type="button" :class="{ active: viewMode === 'list' }" @click="setViewMode('list')">
+            <AppIcon name="list" :size="17" />
+            Liste
+          </button>
+        </div>
+
+        <div class="week-stepper">
+          <button type="button" class="icon-button" aria-label="Vorherige Woche" @click="previousWeek">
+            <AppIcon name="chevron-left" />
+          </button>
+          <button type="button" class="today-button" @click="goToCurrentWeek">Heute</button>
+          <button type="button" class="icon-button" aria-label="Nächste Woche" @click="nextWeek">
+            <AppIcon name="chevron-right" />
+          </button>
+        </div>
+
+        <button type="button" class="auto-plan-button" @click="isAutoPlanOpen = true">
+          <AppIcon name="auto-plan" :size="18" />
+          Woche planen
+        </button>
+      </div>
+    </header>
 
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
     <p v-if="isLoading" class="hint">Lädt…</p>
@@ -209,8 +216,10 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
         <thead>
           <tr>
             <th class="corner"></th>
-            <th v-for="day in weekDays" :key="toIsoDate(day)">
-              {{ weekdayLabel(day) }}<br />
+            <th v-for="day in weekDays" :key="toIsoDate(day)" :class="{ today: isToday(day) }">
+              {{ weekdayLabel(day) }}
+              <span v-if="isToday(day)" class="today-badge">Heute</span>
+              <br />
               <span class="date">{{ formatShortDate(day) }}</span>
             </th>
           </tr>
@@ -218,8 +227,8 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
         <tbody>
           <tr v-for="mealType in MEAL_TYPES" :key="mealType">
             <th class="meal-type-label">{{ MEAL_TYPE_LABELS[mealType] }}</th>
-            <td v-for="day in weekDays" :key="toIsoDate(day) + mealType">
-              <div
+            <td v-for="day in weekDays" :key="toIsoDate(day) + mealType" :class="{ today: isToday(day) }">
+              <article
                 v-for="entry in entriesFor(day, mealType)"
                 :key="entry.id"
                 class="meal-chip"
@@ -228,10 +237,12 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
                 @click="openEditModal(day, mealType, entry)"
                 @keydown.enter="openEditModal(day, mealType, entry)"
               >
-                <button class="remove" type="button" title="Entfernen" @click.stop="handleDelete(entry.id)">
-                  ×
-                </button>
-                <div class="chip-title">{{ entry.recipe.title }}</div>
+                <div class="chip-top">
+                  <div class="chip-title">{{ entry.recipe.title }}</div>
+                  <button class="remove" type="button" title="Entfernen" @click.stop="handleDelete(entry.id)">
+                    <AppIcon name="close" :size="14" />
+                  </button>
+                </div>
                 <div v-if="entry.recipe.calories_per_serving" class="chip-meta">
                   {{ entry.recipe.calories_per_serving }} kcal/Portion
                 </div>
@@ -246,7 +257,7 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
                     title="Hat geschmeckt"
                     @click.stop="handleRate(entry, 'liked')"
                   >
-                    👍
+                    <AppIcon name="thumbs-up" :size="15" />
                   </button>
                   <button
                     type="button"
@@ -255,12 +266,13 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
                     title="Hat nicht geschmeckt"
                     @click.stop="handleRate(entry, 'disliked')"
                   >
-                    👎
+                    <AppIcon name="thumbs-down" :size="15" />
                   </button>
                 </div>
-              </div>
+              </article>
               <button class="add-button" type="button" @click="openModal(day, mealType)">
-                + Mahlzeit
+                <AppIcon name="plus" :size="14" />
+                Mahlzeit
               </button>
             </td>
           </tr>
@@ -284,7 +296,7 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
         <div v-for="mealType in MEAL_TYPES" :key="mealType" class="meal-section">
           <h3 class="meal-section-title">{{ MEAL_TYPE_LABELS[mealType] }}</h3>
 
-          <div
+          <article
             v-for="entry in entriesFor(day, mealType)"
             :key="entry.id"
             class="meal-chip"
@@ -293,10 +305,12 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
             @click="openEditModal(day, mealType, entry)"
             @keydown.enter="openEditModal(day, mealType, entry)"
           >
-            <button class="remove" type="button" title="Entfernen" @click.stop="handleDelete(entry.id)">
-              ×
-            </button>
-            <div class="chip-title">{{ entry.recipe.title }}</div>
+            <div class="chip-top">
+              <div class="chip-title">{{ entry.recipe.title }}</div>
+              <button class="remove" type="button" title="Entfernen" @click.stop="handleDelete(entry.id)">
+                <AppIcon name="close" :size="16" />
+              </button>
+            </div>
             <div v-if="entry.recipe.calories_per_serving" class="chip-meta">
               {{ entry.recipe.calories_per_serving }} kcal/Portion
             </div>
@@ -311,7 +325,7 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
                 title="Hat geschmeckt"
                 @click.stop="handleRate(entry, 'liked')"
               >
-                👍
+                <AppIcon name="thumbs-up" :size="16" />
               </button>
               <button
                 type="button"
@@ -320,12 +334,15 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
                 title="Hat nicht geschmeckt"
                 @click.stop="handleRate(entry, 'disliked')"
               >
-                👎
+                <AppIcon name="thumbs-down" :size="16" />
               </button>
             </div>
-          </div>
+          </article>
 
-          <button class="add-button" type="button" @click="openModal(day, mealType)">+ Mahlzeit</button>
+          <button class="add-button" type="button" @click="openModal(day, mealType)">
+            <AppIcon name="plus" :size="14" />
+            Mahlzeit
+          </button>
         </div>
       </section>
     </div>
@@ -337,7 +354,7 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
           <thead>
             <tr>
               <th>Familienmitglied</th>
-              <th v-for="day in weekDays" :key="`summary-${toIsoDate(day)}`">
+              <th v-for="day in weekDays" :key="`summary-${toIsoDate(day)}`" :class="{ today: isToday(day) }">
                 {{ weekdayLabel(day).slice(0, 2) }}
               </th>
             </tr>
@@ -354,6 +371,7 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
                 v-for="day in weekDays"
                 :key="`cell-${member.id}-${toIsoDate(day)}`"
                 :class="{
+                  today: isToday(day),
                   over: isOverTarget(dayEntry(member, day)?.calories ?? 0, member.daily_calorie_target),
                 }"
               >
@@ -393,78 +411,120 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
 
 <style scoped>
 .wochenplan {
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 2rem 2.5rem;
 }
 
-.week-nav {
+.page-header {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1.25rem;
   margin-bottom: 1.5rem;
 }
 
-.week-label {
+.week-range {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+.page-header h1 {
+  margin: 0.25rem 0 0;
+  font-size: 2.1rem;
+}
+
+.header-actions {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.mode-switch {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+.mode-switch button {
+  height: 2.25rem;
+  padding: 0 1rem;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mode-switch button.active {
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+.week-stepper {
+  display: flex;
   align-items: center;
   gap: 0.25rem;
 }
 
-button {
-  padding: 0.5rem 0.9rem;
-  border: 1px solid var(--color-border);
+.icon-button {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
   border-radius: var(--radius-sm);
-  background: var(--color-background-soft);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
   color: var(--color-text);
-  cursor: pointer;
-  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-button:hover {
+.today-button {
+  height: 2.5rem;
+  padding: 0 0.9rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.icon-button:hover,
+.today-button:hover {
   box-shadow: var(--shadow-sm);
 }
 
-button.link {
-  border: none;
-  background: none;
-  color: var(--color-link);
-  padding: 0;
-  font-size: 0.8rem;
-}
-
-button.link:hover {
-  text-decoration: underline;
-  box-shadow: none;
-}
-
 .auto-plan-button {
-  background: var(--color-button-bg);
-  color: var(--color-button-text);
-  border-color: var(--color-button-bg);
+  height: 2.75rem;
+  padding: 0 1.1rem;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .auto-plan-button:hover {
-  transform: translateY(-1px);
+  background: var(--color-accent-hover);
   box-shadow: var(--shadow-md);
-}
-
-.view-toggle {
-  display: flex;
-  gap: 0.4rem;
-  justify-content: center;
-  margin-bottom: 1rem;
-}
-
-.view-toggle button {
-  background: var(--color-background);
-}
-
-.view-toggle button.active {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: var(--color-button-text);
 }
 
 .error {
@@ -477,57 +537,87 @@ button.link:hover {
 
 .grid-wrapper {
   overflow-x: auto;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
 }
 
 .grid,
 .summary-table {
   width: 100%;
   border-collapse: collapse;
-  border-radius: var(--radius-md);
-  overflow: hidden;
 }
 
 .grid th,
 .grid td,
 .summary-table th,
 .summary-table td {
-  border: 1px solid var(--color-border);
+  border-left: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
   padding: 0.6rem;
   vertical-align: top;
   text-align: left;
   font-size: 0.85rem;
 }
 
+.grid thead th,
+.summary-table thead th {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.grid tbody tr:last-child th,
+.grid tbody tr:last-child td,
+.summary-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.grid th:first-child,
+.grid td:first-child,
+.summary-table th:first-child,
+.summary-table td:first-child {
+  border-left: none;
+}
+
 .grid th {
-  background: var(--color-background-soft);
-  text-align: center;
+  background: var(--color-surface);
+  text-align: left;
   font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.grid th.today,
+.grid td.today,
+.summary-table th.today,
+.summary-table td.today {
+  background: color-mix(in srgb, var(--color-accent) 7%, var(--color-surface));
 }
 
 .grid .date {
   font-weight: 400;
-  opacity: 0.7;
+  color: var(--color-muted);
 }
 
 .meal-type-label {
   white-space: nowrap;
+  color: var(--color-muted);
+  font-weight: 600;
 }
 
 .grid td {
-  min-width: 130px;
+  min-width: 150px;
 }
 
 .meal-chip {
   position: relative;
-  background: var(--color-background-soft);
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 0.4rem 1.2rem 0.4rem 0.5rem;
-  margin-bottom: 0.35rem;
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.55rem;
+  margin-bottom: 0.5rem;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
 .meal-chip:hover,
@@ -538,75 +628,108 @@ button.link:hover {
   box-shadow: var(--shadow-md);
 }
 
+.chip-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+
 .chip-title {
+  flex-grow: 1;
+  min-width: 0;
   font-weight: 600;
+  line-height: 1.3;
 }
 
 .chip-meta,
 .chip-members {
   font-size: 0.75rem;
-  opacity: 0.75;
+  color: var(--color-muted);
 }
 
 .remove {
-  position: absolute;
-  top: 0.15rem;
-  right: 0.25rem;
+  flex-shrink: 0;
+  margin: -0.15rem -0.1rem 0 0;
+  width: 1.5rem;
+  height: 1.5rem;
   border: none;
   background: none;
+  border-radius: 8px;
+  color: var(--color-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
-  font-size: 1rem;
-  line-height: 1;
-  color: #e0554f;
-  opacity: 0.6;
 }
 
 .remove:hover {
-  opacity: 1;
+  color: #e0554f;
+  background: var(--color-surface-2);
   box-shadow: none;
-  transform: scale(1.15);
 }
 
 .chip-rating {
   display: flex;
-  gap: 0.3rem;
-  margin-top: 0.3rem;
+  gap: 0.15rem;
 }
 
 .rate-button {
-  border: 1px solid transparent;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: none;
   background: none;
-  padding: 0.1rem 0.3rem;
-  font-size: 0.85rem;
-  line-height: 1;
-  border-radius: var(--radius-sm);
-  opacity: 0.5;
+  padding: 0;
+  border-radius: 8px;
+  color: var(--color-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .rate-button:hover {
-  opacity: 1;
+  color: var(--color-text);
+  background: var(--color-surface-2);
   box-shadow: none;
 }
 
 .rate-button.active {
-  opacity: 1;
-  border-color: var(--color-accent);
-  background: var(--color-background);
+  color: var(--color-tint-text);
+  background: var(--color-tint);
 }
 
 .add-button {
   width: 100%;
-  font-size: 0.75rem;
-  padding: 0.3rem;
+  font-size: 0.8rem;
+  padding: 0.4rem;
+  border-radius: var(--radius-sm);
+  border: 1.5px dashed var(--color-border);
+  background: transparent;
+  color: var(--color-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+}
+
+.add-button:hover {
+  border-style: solid;
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  box-shadow: none;
 }
 
 .summary {
-  margin-top: 2rem;
+  margin-top: 2.5rem;
+}
+
+.summary h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
 }
 
 .target {
   font-size: 0.75rem;
-  opacity: 0.7;
+  color: var(--color-muted);
   font-weight: 400;
 }
 
@@ -615,7 +738,18 @@ button.link:hover {
 }
 
 .muted {
-  opacity: 0.4;
+  color: var(--color-muted);
+}
+
+.today-badge {
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: 0.7rem;
+  font-weight: 600;
+  vertical-align: middle;
 }
 
 .day-list {
@@ -627,9 +761,9 @@ button.link:hover {
 .day-card {
   scroll-margin-top: 76px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
-  padding: 1rem;
+  padding: 1.1rem;
 }
 
 .day-card.is-today {
@@ -639,23 +773,12 @@ button.link:hover {
 
 .day-card-title {
   margin: 0 0 0.85rem;
-  font-size: 1.15rem;
+  font-size: 1.2rem;
 }
 
 .day-card-title .date {
   font-weight: 400;
-  opacity: 0.7;
-}
-
-.today-badge {
-  margin-left: 0.5rem;
-  padding: 0.15rem 0.55rem;
-  border-radius: 999px;
-  background: var(--color-accent);
-  color: var(--color-button-text);
-  font-size: 0.7rem;
-  font-weight: 600;
-  vertical-align: middle;
+  color: var(--color-muted);
 }
 
 .meal-section {
@@ -668,14 +791,13 @@ button.link:hover {
 
 .meal-section-title {
   margin: 0 0 0.5rem;
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  opacity: 0.65;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-muted);
 }
 
 .day-list .meal-chip {
-  padding: 0.65rem 2.25rem 0.65rem 0.75rem;
+  padding: 0.75rem 0.75rem;
   margin-bottom: 0.5rem;
 }
 
@@ -686,13 +808,6 @@ button.link:hover {
 .day-list .chip-meta,
 .day-list .chip-members {
   font-size: 0.85rem;
-  margin-top: 0.2rem;
-}
-
-.day-list .remove {
-  font-size: 1.3rem;
-  top: 0.5rem;
-  right: 0.6rem;
 }
 
 .day-list .add-button {
@@ -703,10 +818,15 @@ button.link:hover {
 
 @media (max-width: 640px) {
   .wochenplan {
-    padding: 1rem;
+    padding: 1.25rem;
   }
 
-  .week-nav {
+  .page-header {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .header-actions {
     justify-content: center;
   }
 

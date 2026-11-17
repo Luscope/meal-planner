@@ -4,8 +4,8 @@
   "description": "Familien-Rezept- & Wochenplan-App",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#248277",
+  "background_color": "#F6F4EE",
+  "theme_color": "#2E6A4E",
   "icons": [
     {
       "src": "/pwa-192x192.png",

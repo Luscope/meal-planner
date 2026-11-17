@@ -6,6 +6,7 @@ import {
   fetchRecipeImportStatus,
   type ImportStatus,
 } from '@/lib/recipeImport'
+import AppIcon from '@/components/AppIcon.vue'
 
 type SourceType = 'text' | 'url' | 'image'
 
@@ -98,7 +99,10 @@ onUnmounted(stopPolling)
 
 <template>
   <main class="import">
-    <RouterLink to="/rezepte" class="back-link">← Zurück zu den Rezepten</RouterLink>
+    <RouterLink to="/rezepte" class="back-link">
+      <AppIcon name="chevron-left" :size="16" />
+      Zurück zu den Rezepten
+    </RouterLink>
     <h1>Rezept importieren</h1>
 
     <template v-if="!importId">
@@ -150,13 +154,16 @@ onUnmounted(stopPolling)
           <p>Claude extrahiert das Rezept …</p>
         </template>
         <template v-else-if="importStatus === 'completed'">
-          <p>✅ Rezept erfolgreich importiert!</p>
-          <RouterLink :to="{ name: 'recipe-detail', params: { id: recipeId! } }">
-            Zum Rezept →
+          <p class="status-icon success"><AppIcon name="check" :size="22" :stroke-width="2.25" /></p>
+          <p>Rezept erfolgreich importiert!</p>
+          <RouterLink :to="{ name: 'recipe-detail', params: { id: recipeId! } }" class="result-link">
+            Zum Rezept
+            <AppIcon name="chevron-right" :size="16" />
           </RouterLink>
         </template>
         <template v-else-if="importStatus === 'failed'">
-          <p class="error">❌ Import fehlgeschlagen: {{ errorMessage }}</p>
+          <p class="status-icon error-icon"><AppIcon name="close" :size="22" /></p>
+          <p class="error">Import fehlgeschlagen: {{ errorMessage }}</p>
           <button type="button" @click="reset">Erneut versuchen</button>
         </template>
       </div>
@@ -166,51 +173,58 @@ onUnmounted(stopPolling)
 
 <style scoped>
 .import {
-  max-width: 560px;
+  max-width: 580px;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 2rem 1.5rem;
 }
 
 .back-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   margin-bottom: 1rem;
-  color: var(--color-link);
+  color: var(--color-muted);
   text-decoration: none;
   font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .back-link:hover {
-  text-decoration: underline;
+  color: var(--color-text);
+}
+
+h1 {
+  font-size: 1.85rem;
+  margin-bottom: 1.25rem;
 }
 
 .tabs {
-  display: flex;
-  gap: 0.5rem;
+  display: inline-grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
   margin-bottom: 1.25rem;
 }
 
 .tabs button {
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-background-soft);
-  color: var(--color-text);
+  height: 2.5rem;
+  padding: 0 1.1rem;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--color-muted);
   cursor: pointer;
-  font-size: 0.9rem;
-}
-
-.tabs button:hover {
-  box-shadow: var(--shadow-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 
 .tabs button.active {
-  background: var(--color-button-bg);
-  border-color: var(--color-button-bg);
-  color: var(--color-button-text);
-}
-
-.tabs button.active:hover {
-  box-shadow: var(--shadow-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
 }
 
 form {
@@ -223,18 +237,20 @@ label {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  font-size: 0.9rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-muted);
 }
 
 textarea,
 input[type='url'],
 input[type='file'] {
-  padding: 0.55rem 0.65rem;
+  padding: 0.65rem 0.75rem;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-background-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
   color: var(--color-text);
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-family: inherit;
 }
 
@@ -244,7 +260,8 @@ textarea {
 
 .hint {
   font-size: 0.75rem;
-  opacity: 0.7;
+  color: var(--color-muted);
+  font-weight: 400;
 }
 
 .error {
@@ -252,16 +269,19 @@ textarea {
 }
 
 button.submit {
-  padding: 0.6rem 1rem;
+  height: 2.75rem;
+  padding: 0 1.1rem;
   border: none;
-  border-radius: var(--radius-sm);
-  background: var(--color-button-bg);
-  color: var(--color-button-text);
-  font-size: 1rem;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: 0.9375rem;
+  font-weight: 600;
   cursor: pointer;
 }
 
 button.submit:hover:not(:disabled) {
+  background: var(--color-accent-hover);
   box-shadow: var(--shadow-md);
 }
 
@@ -272,10 +292,40 @@ button.submit:disabled {
 
 .status-card {
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  padding: 2rem 1.5rem;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  padding: 2.5rem 1.5rem;
   text-align: center;
+}
+
+.status-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  margin: 0 auto 1rem;
+  border-radius: var(--radius-pill);
+}
+
+.status-icon.success {
+  background: var(--color-tint);
+  color: var(--color-tint-text);
+}
+
+.status-icon.error-icon {
+  background: var(--color-warn-bg);
+  color: #e0554f;
+}
+
+.result-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+  color: var(--color-accent);
+  font-weight: 600;
+  text-decoration: none;
 }
 
 .spinner {
@@ -296,12 +346,14 @@ button.submit:disabled {
 
 .status-card button {
   margin-top: 1rem;
-  padding: 0.5rem 1rem;
+  height: 2.5rem;
+  padding: 0 1rem;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-background-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
   color: var(--color-text);
   cursor: pointer;
+  font-weight: 500;
 }
 
 .status-card button:hover {

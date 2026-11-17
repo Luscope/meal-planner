@@ -1,2 +1,6 @@
 .env
 .env.production
+
+# Personal convenience script with private NAS connection details (IP, port, user) —
+# the repo is public, this must never be committed.
+scripts/update-nas.ps1
