@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { extractErrorMessage } from '@/lib/api'
 import {
@@ -10,9 +10,12 @@ import {
   fetchUnits,
   RECIPE_CATEGORIES,
   RECIPE_CATEGORY_LABELS,
+  SEASONS,
+  SEASON_LABELS,
   updateRecipe,
   type DietType,
   type RecipeCategory,
+  type Season,
 } from '@/lib/recipes'
 import AppIcon from '@/components/AppIcon.vue'
 
@@ -24,6 +27,7 @@ const title = ref('')
 const cuisine = ref('')
 const category = ref<RecipeCategory | ''>('')
 const dietType = ref<DietType | ''>('')
+const seasons = ref<Season[]>([])
 const description = ref('')
 const instructionsText = ref('')
 const servings = ref<number | null>(null)
@@ -58,6 +62,12 @@ function removeIngredientRow(index: number) {
   ingredientRows.splice(index, 1)
 }
 
+const isYearRound = computed(() => SEASONS.every((season) => seasons.value.includes(season)))
+
+function toggleYearRound() {
+  seasons.value = isYearRound.value ? [] : [...SEASONS]
+}
+
 onMounted(async () => {
   // Cuisine/unit suggestions are a nice-to-have for the datalists below;
   // load them independently so a failure here never blocks the recipe from
@@ -87,6 +97,7 @@ onMounted(async () => {
     cuisine.value = recipe.cuisine ?? ''
     category.value = recipe.category ?? ''
     dietType.value = recipe.diet_type ?? ''
+    seasons.value = recipe.seasons ?? []
     description.value = recipe.description ?? ''
     instructionsText.value = recipe.instructions.join('\n')
     servings.value = recipe.servings
@@ -141,6 +152,7 @@ async function handleSubmit() {
       cuisine: cuisine.value || null,
       category: category.value || null,
       diet_type: dietType.value || null,
+      seasons: seasons.value.length > 0 ? seasons.value : null,
       description: description.value || null,
       instructions,
       servings: servings.value ?? undefined,
@@ -211,6 +223,19 @@ async function handleSubmit() {
           </option>
         </select>
       </label>
+
+      <fieldset class="season-field">
+        <legend>Saison</legend>
+        <div class="season-options">
+          <label v-for="season in SEASONS" :key="season" class="season-option">
+            <input v-model="seasons" type="checkbox" :value="season" />
+            {{ SEASON_LABELS[season] }}
+          </label>
+          <button type="button" class="secondary year-round" :class="{ active: isYearRound }" @click="toggleYearRound">
+            Ganzjährig
+          </button>
+        </div>
+      </fieldset>
 
       <label>
         Beschreibung (optional)
@@ -374,6 +399,42 @@ legend {
   font-weight: 600;
   color: var(--color-muted);
   padding: 0 0.35rem;
+}
+
+.season-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+}
+
+.season-option {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.season-option input {
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  accent-color: var(--color-accent);
+}
+
+button.year-round {
+  padding: 0.35rem 0.9rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.8125rem;
+}
+
+button.year-round.active {
+  background: var(--color-tint);
+  border-color: var(--color-accent);
+  color: var(--color-tint-text);
 }
 
 .ingredient-row {

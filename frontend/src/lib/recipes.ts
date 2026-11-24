@@ -43,6 +43,31 @@ export const DIET_TYPE_LABELS: Record<DietType, string> = {
   vegan: 'Vegan',
 }
 
+export type Season = 'spring' | 'summer' | 'autumn' | 'winter'
+
+export const SEASONS: Season[] = ['spring', 'summer', 'autumn', 'winter']
+
+export const SEASON_LABELS: Record<Season, string> = {
+  spring: 'Frühling',
+  summer: 'Sommer',
+  autumn: 'Herbst',
+  winter: 'Winter',
+}
+
+/** All four seasons selected means "year-round". */
+export function isYearRound(seasons: Season[] | null): boolean {
+  return seasons !== null && SEASONS.every((season) => seasons.includes(season))
+}
+
+/** Human-readable label, e.g. "Herbst, Winter" or "Ganzjährig"; null if unclassified. */
+export function seasonsLabel(seasons: Season[] | null): string | null {
+  if (!seasons || seasons.length === 0) return null
+  if (isYearRound(seasons)) return 'Ganzjährig'
+  return SEASONS.filter((season) => seasons.includes(season))
+    .map((season) => SEASON_LABELS[season])
+    .join(', ')
+}
+
 export interface RecipeIngredient {
   id: number
   name: string
@@ -57,6 +82,7 @@ export interface Recipe {
   cuisine: string | null
   category: RecipeCategory | null
   diet_type: DietType | null
+  seasons: Season[] | null
   description: string | null
   servings: number
   prep_time_minutes: number | null
@@ -76,6 +102,7 @@ export interface RecipeFilters {
   cuisine?: string
   category?: RecipeCategory | typeof UNASSIGNED_FILTER
   diet_type?: DietType | typeof UNASSIGNED_FILTER
+  season?: Season | typeof UNASSIGNED_FILTER
   search?: string
   min_calories?: number
   max_calories?: number
@@ -126,6 +153,7 @@ export interface UpdateRecipePayload {
   cuisine?: string | null
   category?: RecipeCategory | null
   diet_type?: DietType | null
+  seasons?: Season[] | null
   description?: string | null
   instructions?: string[]
   servings?: number

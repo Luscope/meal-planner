@@ -3,6 +3,7 @@
 use App\Enums\ProteinSource;
 use App\Enums\RecipeBase;
 use App\Enums\RecipeCategory;
+use App\Enums\Season;
 use App\Models\Household;
 use App\Models\Ingredient;
 use App\Models\Recipe;
@@ -11,18 +12,35 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-test('classifies recipes missing category, base or protein_source and leaves fully-classified ones alone', function () {
+function classification(array $overrides = []): array
+{
+    return array_merge([
+        'category' => RecipeCategory::MainCourse,
+        'seasons' => [Season::Autumn, Season::Winter],
+        'base' => RecipeBase::Pasta,
+        'protein_source' => ProteinSource::Rind,
+    ], $overrides);
+}
+
+function recipeWithIngredient(Household $household, string $title, string $ingredient, array $attributes = []): Recipe
+{
+    $recipe = Recipe::factory()->for($household)->create(array_merge(['title' => $title], $attributes));
+    $recipe->ingredients()->attach(Ingredient::firstOrCreate(['name' => $ingredient])->id, ['quantity' => 100, 'unit' => 'g']);
+
+    return $recipe;
+}
+
+test('classifies recipes missing category, seasons, base or protein_source and leaves fully-classified ones alone', function () {
     $household = Household::factory()->create();
 
-    $unclassified = Recipe::factory()->for($household)->create([
-        'title' => 'Spaghetti Bolognese', 'category' => null, 'base' => null, 'protein_source' => null,
+    $unclassified = recipeWithIngredient($household, 'Spaghetti Bolognese', 'Rinderhack', [
+        'category' => null, 'seasons' => null, 'base' => null, 'protein_source' => null,
     ]);
-    $ingredient = Ingredient::firstOrCreate(['name' => 'Rinderhack']);
-    $unclassified->ingredients()->attach($ingredient->id, ['quantity' => 500, 'unit' => 'g']);
 
     $alreadyClassified = Recipe::factory()->for($household)->create([
         'title' => 'Gemüsecurry',
         'category' => RecipeCategory::MainCourse->value,
+        'seasons' => ['summer'],
         'base' => RecipeBase::Reis->value,
         'protein_source' => ProteinSource::Huelsenfruechte->value,
     ]);
@@ -31,78 +49,84 @@ test('classifies recipes missing category, base or protein_source and leaves ful
         $mock->shouldReceive('classifyBaseAndProtein')
             ->once()
             ->with('Spaghetti Bolognese', ['Rinderhack'])
-            ->andReturn(['category' => RecipeCategory::MainCourse, 'base' => RecipeBase::Pasta, 'protein_source' => ProteinSource::Rind]);
+            ->andReturn(classification());
     });
 
     $this->artisan('recipes:classify-base-protein')->assertSuccessful();
 
     expect($unclassified->fresh()->category)->toBe(RecipeCategory::MainCourse)
+        ->and($unclassified->fresh()->seasons)->toBe(['autumn', 'winter'])
         ->and($unclassified->fresh()->base)->toBe(RecipeBase::Pasta)
         ->and($unclassified->fresh()->protein_source)->toBe(ProteinSource::Rind)
         ->and($alreadyClassified->fresh()->base)->toBe(RecipeBase::Reis)
-        ->and($alreadyClassified->fresh()->protein_source)->toBe(ProteinSource::Huelsenfruechte);
+        ->and($alreadyClassified->fresh()->seasons)->toBe(['summer']);
 });
 
-test('classifies a recipe missing only its category, even when base/protein_source are already set', function () {
+test('fills only the empty fields and never overwrites already-set (possibly hand-corrected) ones', function () {
     $household = Household::factory()->create();
 
-    $recipe = Recipe::factory()->for($household)->create([
-        'title' => 'Tiramisu',
-        'category' => null,
+    $recipe = recipeWithIngredient($household, 'Tiramisu', 'Mascarpone', [
+        'category' => RecipeCategory::Dessert->value,
+        'seasons' => null,
         'base' => RecipeBase::Sonstiges->value,
         'protein_source' => ProteinSource::MilchprodukteKaese->value,
     ]);
-    $recipe->ingredients()->attach(Ingredient::firstOrCreate(['name' => 'Mascarpone'])->id, ['quantity' => 250, 'unit' => 'g']);
 
     $this->mock(RecipeExtractor::class, function ($mock) {
-        $mock->shouldReceive('classifyBaseAndProtein')
-            ->once()
-            ->andReturn(['category' => RecipeCategory::Dessert, 'base' => RecipeBase::Sonstiges, 'protein_source' => ProteinSource::MilchprodukteKaese]);
+        // Claude "disagrees" on everything, but only the missing seasons may be written.
+        $mock->shouldReceive('classifyBaseAndProtein')->once()->andReturn(classification([
+            'category' => RecipeCategory::Snack,
+            'seasons' => [Season::Summer],
+            'base' => RecipeBase::Reis,
+            'protein_source' => ProteinSource::Ei,
+        ]));
     });
 
     $this->artisan('recipes:classify-base-protein')->assertSuccessful();
 
-    expect($recipe->fresh()->category)->toBe(RecipeCategory::Dessert);
+    $fresh = $recipe->fresh();
+    expect($fresh->seasons)->toBe(['summer'])
+        ->and($fresh->category)->toBe(RecipeCategory::Dessert)
+        ->and($fresh->base)->toBe(RecipeBase::Sonstiges)
+        ->and($fresh->protein_source)->toBe(ProteinSource::MilchprodukteKaese);
 });
 
-test('--force re-classifies recipes that already have category, base and protein_source', function () {
+test('--force re-classifies and overwrites recipes that are already fully classified', function () {
     $household = Household::factory()->create();
 
-    $recipe = Recipe::factory()->for($household)->create([
-        'title' => 'Linsensuppe',
+    $recipe = recipeWithIngredient($household, 'Linsensuppe', 'Linsen', [
         'category' => RecipeCategory::MainCourse->value,
+        'seasons' => ['summer'],
         'base' => RecipeBase::Sonstiges->value,
         'protein_source' => ProteinSource::KeinHauptprotein->value,
     ]);
-    $ingredient = Ingredient::firstOrCreate(['name' => 'Linsen']);
-    $recipe->ingredients()->attach($ingredient->id, ['quantity' => 200, 'unit' => 'g']);
 
     $this->mock(RecipeExtractor::class, function ($mock) {
-        $mock->shouldReceive('classifyBaseAndProtein')
-            ->once()
-            ->andReturn(['category' => RecipeCategory::MainCourse, 'base' => RecipeBase::Huelsenfruechte, 'protein_source' => ProteinSource::Huelsenfruechte]);
+        $mock->shouldReceive('classifyBaseAndProtein')->once()->andReturn(classification([
+            'seasons' => [Season::Autumn, Season::Winter],
+            'base' => RecipeBase::Huelsenfruechte,
+            'protein_source' => ProteinSource::Huelsenfruechte,
+        ]));
     });
 
     $this->artisan('recipes:classify-base-protein', ['--force' => true])->assertSuccessful();
 
-    expect($recipe->fresh()->base)->toBe(RecipeBase::Huelsenfruechte);
+    expect($recipe->fresh()->base)->toBe(RecipeBase::Huelsenfruechte)
+        ->and($recipe->fresh()->seasons)->toBe(['autumn', 'winter']);
 });
 
 test('--household limits classification to that household', function () {
     $household = Household::factory()->create();
     $otherHousehold = Household::factory()->create();
 
-    $ownRecipe = Recipe::factory()->for($household)->create(['title' => 'Own', 'category' => null, 'base' => null, 'protein_source' => null]);
-    $ownRecipe->ingredients()->attach(Ingredient::firstOrCreate(['name' => 'Nudeln'])->id, ['quantity' => 200, 'unit' => 'g']);
-
-    $otherRecipe = Recipe::factory()->for($otherHousehold)->create(['title' => 'Other', 'category' => null, 'base' => null, 'protein_source' => null]);
-    $otherRecipe->ingredients()->attach(Ingredient::firstOrCreate(['name' => 'Reis'])->id, ['quantity' => 200, 'unit' => 'g']);
+    $ownRecipe = recipeWithIngredient($household, 'Own', 'Nudeln', ['category' => null, 'seasons' => null, 'base' => null, 'protein_source' => null]);
+    $otherRecipe = recipeWithIngredient($otherHousehold, 'Other', 'Reis', ['category' => null, 'seasons' => null, 'base' => null, 'protein_source' => null]);
 
     $this->mock(RecipeExtractor::class, function ($mock) {
         $mock->shouldReceive('classifyBaseAndProtein')
             ->once()
             ->with('Own', ['Nudeln'])
-            ->andReturn(['category' => RecipeCategory::MainCourse, 'base' => RecipeBase::Pasta, 'protein_source' => ProteinSource::KeinHauptprotein]);
+            ->andReturn(classification(['protein_source' => ProteinSource::KeinHauptprotein]));
     });
 
     $this->artisan('recipes:classify-base-protein', ['--household' => $household->id])->assertSuccessful();

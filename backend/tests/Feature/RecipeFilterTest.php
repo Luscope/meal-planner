@@ -149,6 +149,41 @@ test('filters recipes with no diet type assigned', function () {
         ->assertJsonPath('data.0.title', 'Ohne Ernährungsform');
 });
 
+test('filters recipes by season, including year-round recipes', function () {
+    [$household] = actingAsHouseholdUser();
+
+    Recipe::factory()->for($household)->create(['title' => 'Spargelsalat', 'seasons' => ['spring', 'summer']]);
+    Recipe::factory()->for($household)->create(['title' => 'Kürbissuppe', 'seasons' => ['autumn', 'winter']]);
+    Recipe::factory()->for($household)->create(['title' => 'Pasta Pomodoro', 'seasons' => ['spring', 'summer', 'autumn', 'winter']]);
+    Recipe::factory()->for($household)->create(['title' => 'Ohne Saison', 'seasons' => null]);
+
+    $titles = collect($this->getJson('/api/recipes?season=summer')->assertOk()->json('data'))->pluck('title')->sort()->values()->all();
+
+    expect($titles)->toBe(['Pasta Pomodoro', 'Spargelsalat']);
+
+    $winter = collect($this->getJson('/api/recipes?season=winter')->assertOk()->json('data'))->pluck('title')->sort()->values()->all();
+
+    expect($winter)->toBe(['Kürbissuppe', 'Pasta Pomodoro']);
+});
+
+test('filters recipes with no season assigned', function () {
+    [$household] = actingAsHouseholdUser();
+
+    Recipe::factory()->for($household)->create(['seasons' => null, 'title' => 'Ohne Saison']);
+    Recipe::factory()->for($household)->create(['seasons' => ['summer']]);
+
+    $this->getJson('/api/recipes?season=__unassigned__')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.title', 'Ohne Saison');
+});
+
+test('rejects an invalid season filter value', function () {
+    actingAsHouseholdUser();
+
+    $this->getJson('/api/recipes?season=monsoon')->assertStatus(422);
+});
+
 test('recipes are scoped to the requesting household', function () {
     [$household] = actingAsHouseholdUser();
     $otherHousehold = Household::factory()->create();

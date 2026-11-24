@@ -53,6 +53,36 @@ test('updates the recipe diet type', function () {
     expect($recipe->fresh()->diet_type)->toBe(App\Enums\DietType::Vegan);
 });
 
+test('updates the recipe seasons', function () {
+    [$household] = actingAsHouseholdUser();
+    $recipe = Recipe::factory()->for($household)->create(['seasons' => null]);
+
+    $this->patchJson("/api/recipes/{$recipe->id}", ['seasons' => ['autumn', 'winter']])
+        ->assertOk()
+        ->assertJsonPath('data.seasons', ['autumn', 'winter']);
+
+    expect($recipe->fresh()->seasons)->toBe(['autumn', 'winter']);
+});
+
+test('an empty seasons selection is stored as not classified', function () {
+    [$household] = actingAsHouseholdUser();
+    $recipe = Recipe::factory()->for($household)->create(['seasons' => ['summer']]);
+
+    $this->patchJson("/api/recipes/{$recipe->id}", ['seasons' => []])
+        ->assertOk()
+        ->assertJsonPath('data.seasons', null);
+
+    expect($recipe->fresh()->seasons)->toBeNull();
+});
+
+test('rejects an invalid or duplicated season on update', function () {
+    [$household] = actingAsHouseholdUser();
+    $recipe = Recipe::factory()->for($household)->create();
+
+    $this->patchJson("/api/recipes/{$recipe->id}", ['seasons' => ['summer', 'monsoon']])->assertStatus(422);
+    $this->patchJson("/api/recipes/{$recipe->id}", ['seasons' => ['summer', 'summer']])->assertStatus(422);
+});
+
 test('rejects an invalid diet_type value on update', function () {
     [$household] = actingAsHouseholdUser();
     $recipe = Recipe::factory()->for($household)->create();

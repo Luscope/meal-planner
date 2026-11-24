@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\DietType;
 use App\Enums\RecipeCategory;
+use App\Enums\Season;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\RecipeResource;
 use App\Models\Ingredient;
@@ -29,6 +30,7 @@ class RecipeController extends Controller
             'cuisine' => ['nullable', 'string'],
             'category' => ['nullable', Rule::in([...array_column(RecipeCategory::cases(), 'value'), self::UNASSIGNED])],
             'diet_type' => ['nullable', Rule::in([...array_column(DietType::cases(), 'value'), self::UNASSIGNED])],
+            'season' => ['nullable', Rule::in([...array_column(Season::cases(), 'value'), self::UNASSIGNED])],
             'search' => ['nullable', 'string'],
             'min_calories' => ['nullable', 'integer', 'min:0'],
             'max_calories' => ['nullable', 'integer', 'min:0'],
@@ -48,6 +50,11 @@ class RecipeController extends Controller
             ->when($validated['diet_type'] ?? null, fn ($q, $dietType) => $dietType === self::UNASSIGNED
                 ? $q->whereNull('diet_type')
                 : $q->where('diet_type', $dietType))
+            // A year-round recipe stores all four seasons, so it naturally
+            // matches every single-season filter.
+            ->when($validated['season'] ?? null, fn ($q, $season) => $season === self::UNASSIGNED
+                ? $q->whereNull('seasons')
+                : $q->whereJsonContains('seasons', $season))
             ->when($validated['search'] ?? null, fn ($q, $search) => $q->where('title', 'like', "%{$search}%"))
             ->when($validated['min_calories'] ?? null, fn ($q, $min) => $q->where('calories_per_serving', '>=', $min))
             ->when($validated['max_calories'] ?? null, fn ($q, $max) => $q->where('calories_per_serving', '<=', $max))
@@ -86,6 +93,8 @@ class RecipeController extends Controller
             'cuisine' => ['nullable', 'string', 'max:255'],
             'category' => ['nullable', Rule::in(array_column(RecipeCategory::cases(), 'value'))],
             'diet_type' => ['nullable', Rule::in(array_column(DietType::cases(), 'value'))],
+            'seasons' => ['nullable', 'array'],
+            'seasons.*' => ['distinct', Rule::in(array_column(Season::cases(), 'value'))],
             'description' => ['nullable', 'string'],
             'instructions' => ['sometimes', 'array', 'min:1'],
             'instructions.*' => ['string'],
@@ -102,6 +111,13 @@ class RecipeController extends Controller
             'ingredients.*.unit' => ['required_with:ingredients', 'string', 'max:50'],
             'ingredients.*.notes' => ['nullable', 'string'],
         ]);
+
+        // An empty selection means "not classified" (NULL), not "no season".
+        if (array_key_exists('seasons', $validated)) {
+            $validated['seasons'] = $validated['seasons'] === [] || $validated['seasons'] === null
+                ? null
+                : array_values($validated['seasons']);
+        }
 
         $recipe->update(Arr::except($validated, ['ingredients']));
 

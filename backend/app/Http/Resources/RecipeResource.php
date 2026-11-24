@@ -20,6 +20,7 @@ class RecipeResource extends JsonResource
             'cuisine' => $this->cuisine,
             'category' => $this->category,
             'diet_type' => $this->diet_type,
+            'seasons' => $this->seasons,
             'description' => $this->description,
             'servings' => $this->servings,
             'prep_time_minutes' => $this->prep_time_minutes,

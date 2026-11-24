@@ -11,9 +11,9 @@ class ClassifyRecipeBaseAndProtein extends Command
 {
     protected $signature = 'recipes:classify-base-protein
         {--household= : Only classify recipes belonging to this household ID}
-        {--force : Re-classify recipes that already have a category/base/protein_source}';
+        {--force : Re-classify and overwrite values that are already set (default: only fill empty ones)}';
 
-    protected $description = 'Classify recipes (category + base ingredient + protein source) from their title/ingredients via Claude';
+    protected $description = 'Classify recipes (category + seasons + base ingredient + protein source) from their title/ingredients via Claude';
 
     public function handle(RecipeExtractor $extractor): int
     {
@@ -25,7 +25,7 @@ class ClassifyRecipeBaseAndProtein extends Command
 
         if (! $this->option('force')) {
             $query->where(function ($q) {
-                $q->whereNull('category')->orWhereNull('base')->orWhereNull('protein_source');
+                $q->whereNull('category')->orWhereNull('seasons')->orWhereNull('base')->orWhereNull('protein_source');
             });
         }
 
@@ -54,11 +54,24 @@ class ClassifyRecipeBaseAndProtein extends Command
 
             try {
                 $result = $extractor->classifyBaseAndProtein($recipe->title, $ingredientNames);
-                $recipe->update([
+                $classified = [
                     'category' => $result['category'],
+                    'seasons' => array_map(fn ($season) => $season->value, $result['seasons']),
                     'base' => $result['base'],
                     'protein_source' => $result['protein_source'],
-                ]);
+                ];
+
+                // Without --force, only fill what is still empty so manual
+                // corrections to already-classified fields are never overwritten.
+                if (! $this->option('force')) {
+                    $classified = array_filter(
+                        $classified,
+                        fn ($value, $field) => $recipe->getAttribute($field) === null,
+                        ARRAY_FILTER_USE_BOTH
+                    );
+                }
+
+                $recipe->update($classified);
             } catch (Throwable $e) {
                 $failures++;
                 $this->newLine();
