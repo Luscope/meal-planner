@@ -17,8 +17,8 @@ use Illuminate\Support\Carbon;
  * slots in the same run are influenced by earlier picks.
  *
  * Recipes are plain arrays (not Eloquent models) so this class — and its
- * tests — never need a database: {id, cuisine, category, diet_type, base,
- * protein_source, prep_time_minutes, cook_time_minutes, ingredient_names}.
+ * tests — never need a database: {id, cuisine, category, diet_type, seasons,
+ * base, protein_source, prep_time_minutes, cook_time_minutes, ingredient_names}.
  *
  * `constraints.day_overrides` lets a criteria phrase like "freitags Fisch"
  * or "montags schnell" pin a preference to one weekday (Carbon's English
@@ -270,6 +270,8 @@ class RecipeScorer
             $score += $weights['day_override_protein_match'] ?? 0.0;
         }
 
+        $score += $this->seasonScore($recipe, $slotDate, $weights);
+
         if (! empty($recipe['base'])) {
             $score += ($weights['base_repetition'] ?? 0.0) * ($this->baseCounts[$recipe['base']] ?? 0);
         }
@@ -285,6 +287,41 @@ class RecipeScorer
         }
 
         return $score;
+    }
+
+    /**
+     * Seasonal fit of a recipe for the slot's date. Only recipes that are
+     * explicitly limited to some seasons (not all four, not unclassified)
+     * are rewarded or penalized — year-round and unknown recipes stay neutral.
+     *
+     * @param  array<string, mixed>  $recipe
+     * @param  array<string, float>  $weights
+     */
+    private function seasonScore(array $recipe, string $slotDate, array $weights): float
+    {
+        $seasons = $recipe['seasons'] ?? null;
+
+        if (empty($seasons) || count(array_unique($seasons)) >= 4) {
+            return 0.0;
+        }
+
+        return in_array($this->seasonOf($slotDate), $seasons, true)
+            ? ($weights['season_match'] ?? 0.0)
+            : ($weights['season_mismatch'] ?? 0.0);
+    }
+
+    /**
+     * Meteorological season (northern hemisphere): Mar–May spring, Jun–Aug
+     * summer, Sep–Nov autumn, Dec–Feb winter. Values match App\Enums\Season.
+     */
+    private function seasonOf(string $date): string
+    {
+        return match ((int) Carbon::parse($date)->format('n')) {
+            3, 4, 5 => 'spring',
+            6, 7, 8 => 'summer',
+            9, 10, 11 => 'autumn',
+            default => 'winter',
+        };
     }
 
     /**

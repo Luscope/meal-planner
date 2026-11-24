@@ -21,6 +21,7 @@ function scorerRecipe(array $overrides = []): array
         'title' => 'Test-Rezept',
         'cuisine' => null,
         'category' => null,
+        'seasons' => null,
         'diet_type' => null,
         'base' => null,
         'protein_source' => null,
@@ -175,4 +176,48 @@ test('a day override applies a prep-time limit only on its matching weekday', fu
     // recipe was just used on Monday, so cooldown now favors the slow one.
     $tuesdayPick = $scorer->pick([$slow, $fast], $tuesday);
     expect($tuesdayPick['id'])->toBe(1);
+});
+
+test('prefers a recipe that fits the slot date\'s season over one that does not', function () {
+    $summerDish = scorerRecipe(['id' => 1, 'seasons' => ['spring', 'summer']]);
+    $winterDish = scorerRecipe(['id' => 2, 'seasons' => ['autumn', 'winter']]);
+
+    // July → summer, January → winter. Array order is deliberately the "wrong" one each time.
+    expect((new RecipeScorer())->pick([$winterDish, $summerDish], '2026-07-20')['id'])->toBe(1)
+        ->and((new RecipeScorer())->pick([$summerDish, $winterDish], '2027-01-11')['id'])->toBe(2);
+});
+
+test('season boundaries follow the meteorological seasons', function () {
+    $spring = scorerRecipe(['id' => 1, 'seasons' => ['spring']]);
+    $autumn = scorerRecipe(['id' => 2, 'seasons' => ['autumn']]);
+    $winter = scorerRecipe(['id' => 3, 'seasons' => ['winter']]);
+    $summer = scorerRecipe(['id' => 4, 'seasons' => ['summer']]);
+    $all = [$spring, $autumn, $winter, $summer];
+
+    expect((new RecipeScorer())->pick($all, '2026-03-01')['id'])->toBe(1)   // 1 March = spring
+        ->and((new RecipeScorer())->pick($all, '2026-06-01')['id'])->toBe(4) // 1 June = summer
+        ->and((new RecipeScorer())->pick($all, '2026-09-01')['id'])->toBe(2) // 1 Sept = autumn
+        ->and((new RecipeScorer())->pick($all, '2026-12-01')['id'])->toBe(3) // 1 Dec = winter
+        ->and((new RecipeScorer())->pick($all, '2027-02-28')['id'])->toBe(3); // end of Feb = winter
+});
+
+test('year-round and unclassified recipes are neutral, ranking between a match and a mismatch', function () {
+    $match = scorerRecipe(['id' => 1, 'seasons' => ['summer']]);
+    $yearRound = scorerRecipe(['id' => 2, 'seasons' => ['spring', 'summer', 'autumn', 'winter']]);
+    $unknown = scorerRecipe(['id' => 3, 'seasons' => null]);
+    $mismatch = scorerRecipe(['id' => 4, 'seasons' => ['winter']]);
+
+    $july = '2026-07-20';
+
+    // A match beats neutral ones…
+    expect((new RecipeScorer())->pick([$yearRound, $unknown, $match], $july)['id'])->toBe(1);
+    // …and neutral ones beat a mismatch (yearRound listed first so it wins the neutral tie).
+    expect((new RecipeScorer())->pick([$mismatch, $yearRound, $unknown], $july)['id'])->toBe(2);
+    expect((new RecipeScorer())->pick([$mismatch, $unknown], $july)['id'])->toBe(3);
+});
+
+test('an out-of-season recipe is still picked when it is the only option', function () {
+    $winterOnly = scorerRecipe(['id' => 1, 'seasons' => ['winter']]);
+
+    expect((new RecipeScorer())->pick([$winterOnly], '2026-07-20')['id'])->toBe(1);
 });
