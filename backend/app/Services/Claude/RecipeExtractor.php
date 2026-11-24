@@ -7,6 +7,7 @@ use App\Enums\DietType;
 use App\Enums\ProteinSource;
 use App\Enums\RecipeBase;
 use App\Enums\RecipeCategory;
+use App\Enums\Season;
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -113,15 +114,15 @@ class RecipeExtractor
     }
 
     /**
-     * Classifies an existing recipe's category, dominant base ingredient and
-     * protein source from its title and ingredient list alone — in one call,
+     * Classifies an existing recipe's category, seasons, dominant base
+     * ingredient and protein source from its title and ingredient list alone — in one call,
      * so a backfill over many existing recipes doesn't need three separate
      * API calls per recipe. Same rationale as {@see classifyDietType()}: a
      * cheap, focused judgment call over a short ingredient list rather than
      * a full re-extraction.
      *
      * @param  list<string>  $ingredientNames
-     * @return array{category: RecipeCategory, base: RecipeBase, protein_source: ProteinSource}
+     * @return array{category: RecipeCategory, seasons: list<Season>, base: RecipeBase, protein_source: ProteinSource}
      */
     public function classifyBaseAndProtein(string $title, array $ingredientNames): array
     {
@@ -144,6 +145,7 @@ class RecipeExtractor
 
                 return [
                     'category' => RecipeCategory::from($data['category']),
+                    'seasons' => array_map(fn ($value) => Season::from($value), $data['seasons']),
                     'base' => RecipeBase::from($data['base']),
                     'protein_source' => ProteinSource::from($data['protein_source']),
                 ];
@@ -158,7 +160,7 @@ class RecipeExtractor
         $ingredients = implode(', ', $ingredientNames);
 
         return "Recipe title: {$title}\nIngredients: {$ingredients}\n\n"
-            .'Classify the course/category, the dominant base ingredient (carbohydrate component), and the '
+            .'Classify the course/category, the seasons it fits, the dominant base ingredient (carbohydrate component), and the '
             .'dominant protein source of this dish, strictly from the literal title and ingredients list above.';
     }
 
@@ -172,6 +174,7 @@ class RecipeExtractor
                     'enum' => array_column(RecipeCategory::cases(), 'value'),
                     'description' => 'The best-fitting course/category for this dish: appetizer (Vorspeise), main_course (Hauptspeise), side_dish (Beilage), dessert (Dessert), snack (Snack), or drink (Getränk).',
                 ],
+                'seasons' => $this->seasonsSchema(),
                 'base' => [
                     'type' => 'string',
                     'enum' => array_column(RecipeBase::cases(), 'value'),
@@ -183,8 +186,23 @@ class RecipeExtractor
                     'description' => 'The dominant protein source: huhn_gefluegel (chicken/poultry), rind (beef), schwein (pork), fisch_meeresfruechte (fish/seafood), tofu_seitan, huelsenfruechte (legumes/lentils/beans as protein), ei (egg as main protein), milchprodukte_kaese (dairy/cheese as main protein), or kein_hauptprotein (no significant protein source, e.g. a plain side dish or dessert).',
                 ],
             ],
-            'required' => ['category', 'base', 'protein_source'],
+            'required' => ['category', 'seasons', 'base', 'protein_source'],
             'additionalProperties' => false,
+        ];
+    }
+
+    /**
+     * Shared by the import schema and the classify-only schema.
+     *
+     * @return array<string, mixed>
+     */
+    private function seasonsSchema(): array
+    {
+        return [
+            'type' => 'array',
+            'items' => ['type' => 'string', 'enum' => array_column(Season::cases(), 'value')],
+            'minItems' => 1,
+            'description' => 'The seasons in which this dish fits best, judged from its ingredients (fresh seasonal produce such as asparagus, strawberries, pumpkin or kale) and its character (hearty stews = autumn/winter, light salads = spring/summer). Include every season it suits. Use all four (spring, summer, autumn, winter) when it works year-round, e.g. dishes built on pantry staples like pasta, rice or legumes.',
         ];
     }
 
@@ -313,6 +331,7 @@ class RecipeExtractor
                     'enum' => array_column(ProteinSource::cases(), 'value'),
                     'description' => 'The dominant protein source: huhn_gefluegel (chicken/poultry), rind (beef), schwein (pork), fisch_meeresfruechte (fish/seafood), tofu_seitan, huelsenfruechte (legumes/lentils/beans as protein), ei (egg as main protein), milchprodukte_kaese (dairy/cheese as main protein), or kein_hauptprotein (no significant protein source, e.g. a plain side dish or dessert).',
                 ],
+                'seasons' => $this->seasonsSchema(),
                 'description' => ['type' => ['string', 'null']],
                 'servings' => ['type' => 'integer'],
                 'prep_time_minutes' => ['type' => ['integer', 'null']],
@@ -343,7 +362,7 @@ class RecipeExtractor
                     'minItems' => 1,
                 ],
             ],
-            'required' => ['title', 'category', 'diet_type', 'base', 'protein_source', 'servings', 'instructions', 'ingredients'],
+            'required' => ['title', 'category', 'diet_type', 'seasons', 'base', 'protein_source', 'servings', 'instructions', 'ingredients'],
             'additionalProperties' => false,
         ];
     }

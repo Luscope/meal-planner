@@ -8,11 +8,15 @@ import {
   fetchRecipes,
   RECIPE_CATEGORIES,
   RECIPE_CATEGORY_LABELS,
+  SEASONS,
+  SEASON_LABELS,
+  seasonsLabel,
   UNASSIGNED_FILTER,
   type DietType,
   type PaginatedRecipes,
   type Recipe,
   type RecipeCategory,
+  type Season,
 } from '@/lib/recipes'
 import AppIcon from '@/components/AppIcon.vue'
 
@@ -27,6 +31,7 @@ const filters = reactive({
   cuisine: '',
   category: '' as RecipeCategory | typeof UNASSIGNED_FILTER | '',
   dietType: '' as DietType | typeof UNASSIGNED_FILTER | '',
+  season: '' as Season | typeof UNASSIGNED_FILTER | '',
   search: '',
   minCalories: null as number | null,
   maxCalories: null as number | null,
@@ -44,6 +49,7 @@ async function loadRecipes() {
       cuisine: filters.cuisine || undefined,
       category: filters.category || undefined,
       diet_type: filters.dietType || undefined,
+      season: filters.season || undefined,
       search: filters.search || undefined,
       min_calories: filters.minCalories ?? undefined,
       max_calories: filters.maxCalories ?? undefined,
@@ -68,6 +74,7 @@ function resetFilters() {
   filters.cuisine = ''
   filters.category = ''
   filters.dietType = ''
+  filters.season = ''
   filters.search = ''
   filters.minCalories = null
   filters.maxCalories = null
@@ -198,6 +205,20 @@ onMounted(async () => {
           </span>
         </label>
 
+        <label>
+          Saison
+          <span class="select-wrapper">
+            <select v-model="filters.season">
+              <option value="">Alle</option>
+              <option :value="UNASSIGNED_FILTER">Ohne Zuordnung</option>
+              <option v-for="season in SEASONS" :key="season" :value="season">
+                {{ SEASON_LABELS[season] }}
+              </option>
+            </select>
+            <AppIcon name="chevron-down" :size="16" />
+          </span>
+        </label>
+
         <div class="calorie-range">
           <span class="calorie-range-label">Kalorien pro Portion</span>
           <div class="calorie-range-inputs">
@@ -230,8 +251,13 @@ onMounted(async () => {
           {{ [recipe.cuisine, recipe.category && RECIPE_CATEGORY_LABELS[recipe.category]].filter(Boolean).join(' · ') }}
         </p>
         <h2>{{ recipe.title }}</h2>
-        <div v-if="recipe.diet_type" class="badges">
-          <span :class="dietBadgeClass(recipe.diet_type)">{{ DIET_TYPE_LABELS[recipe.diet_type] }}</span>
+        <div v-if="recipe.diet_type || seasonsLabel(recipe.seasons)" class="badges">
+          <span v-if="recipe.diet_type" :class="dietBadgeClass(recipe.diet_type)">{{
+            DIET_TYPE_LABELS[recipe.diet_type]
+          }}</span>
+          <span v-if="seasonsLabel(recipe.seasons)" class="diet-badge diet-badge-neutral">{{
+            seasonsLabel(recipe.seasons)
+          }}</span>
         </div>
         <p class="meta">
           <span v-if="totalTime(recipe)" class="meta-item">

@@ -42,7 +42,7 @@ class AutoPlanController extends Controller
             ->whereHas('ingredients')
             ->with('ingredients:id,name')
             ->get([
-                'id', 'title', 'cuisine', 'category', 'diet_type', 'base', 'protein_source',
+                'id', 'title', 'cuisine', 'category', 'diet_type', 'seasons', 'base', 'protein_source',
                 'servings', 'prep_time_minutes', 'cook_time_minutes',
                 'calories_per_serving', 'protein_per_serving_g',
             ]);
@@ -111,6 +111,7 @@ class AutoPlanController extends Controller
             'title' => $recipe->title,
             'cuisine' => $recipe->cuisine,
             'category' => $recipe->category?->value,
+            'seasons' => $recipe->seasons,
             'diet_type' => $recipe->diet_type?->value,
             'base' => $recipe->base?->value,
             'protein_source' => $recipe->protein_source?->value,

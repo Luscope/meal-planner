@@ -2,7 +2,14 @@
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { extractErrorMessage } from '@/lib/api'
-import { DIET_TYPE_LABELS, fetchRecipe, RECIPE_CATEGORY_LABELS, type DietType, type Recipe } from '@/lib/recipes'
+import {
+  DIET_TYPE_LABELS,
+  fetchRecipe,
+  RECIPE_CATEGORY_LABELS,
+  seasonsLabel,
+  type DietType,
+  type Recipe,
+} from '@/lib/recipes'
 import AppIcon from '@/components/AppIcon.vue'
 
 const route = useRoute()
@@ -53,8 +60,13 @@ onMounted(async () => {
         {{ [recipe.cuisine, recipe.category && RECIPE_CATEGORY_LABELS[recipe.category]].filter(Boolean).join(' · ') }}
       </p>
       <h1>{{ recipe.title }}</h1>
-      <div v-if="recipe.diet_type" class="badges">
-        <span :class="dietBadgeClass(recipe.diet_type)">{{ DIET_TYPE_LABELS[recipe.diet_type] }}</span>
+      <div v-if="recipe.diet_type || seasonsLabel(recipe.seasons)" class="badges">
+        <span v-if="recipe.diet_type" :class="dietBadgeClass(recipe.diet_type)">{{
+          DIET_TYPE_LABELS[recipe.diet_type]
+        }}</span>
+        <span v-if="seasonsLabel(recipe.seasons)" class="diet-badge diet-badge-neutral">{{
+          seasonsLabel(recipe.seasons)
+        }}</span>
       </div>
       <p v-if="recipe.description" class="description">{{ recipe.description }}</p>
 

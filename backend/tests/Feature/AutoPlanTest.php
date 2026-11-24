@@ -279,3 +279,22 @@ test('apply creates meal plans for valid assignments and skips foreign-household
     expect((float) $created->planned_servings)->toEqual(3.0)
         ->and($created->familyMembers)->toHaveCount(1);
 });
+
+test('preview prefers recipes that fit the season of the planned date', function () {
+    config(['mealplanner.candidate_pool_size' => 1, 'mealplanner.weights.random_jitter' => 0]);
+
+    $household = autoPlanHousehold();
+    $summer = withIngredient(Recipe::factory()->for($household)->create(['seasons' => ['spring', 'summer'], 'cuisine' => null]), 'Erdbeeren');
+    $winter = withIngredient(Recipe::factory()->for($household)->create(['seasons' => ['autumn', 'winter'], 'cuisine' => null]), 'Kürbis');
+    FamilyMember::factory()->for($household)->create();
+
+    $this->mock(MealPlanConstraintExtractor::class, function ($mock) {
+        $mock->shouldReceive('extract')->andReturn(noConstraints());
+    });
+
+    $inJuly = $this->postJson('/api/meal-plans/auto-plan?start_date=2026-07-20&end_date=2026-07-20', ['meal_types' => ['dinner']]);
+    $inJanuary = $this->postJson('/api/meal-plans/auto-plan?start_date=2027-01-11&end_date=2027-01-11', ['meal_types' => ['dinner']]);
+
+    expect($inJuly->json('assignments.0.recipe_id'))->toBe($summer->id)
+        ->and($inJanuary->json('assignments.0.recipe_id'))->toBe($winter->id);
+});
