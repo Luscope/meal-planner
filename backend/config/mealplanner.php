@@ -54,6 +54,15 @@ return [
         // being a hard filter that could leave the slot empty.
         'day_override_protein_match' => 15.0,
 
+        // Seasonality, judged against the season of the slot's date. A recipe
+        // limited to specific seasons that includes the slot's season gets a
+        // bonus; one that excludes it gets a clear (but not absolute) malus,
+        // so a household with few recipes never ends up with empty slots.
+        // Year-round (all four seasons) and unclassified (NULL) recipes stay
+        // neutral.
+        'season_match' => 4.0,
+        'season_mismatch' => -10.0,
+
         // Small random term (± this value) so ties don't always resolve the same way.
         'random_jitter' => 1.0,
     ],
