@@ -83,6 +83,9 @@ export interface Recipe {
   category: RecipeCategory | null
   diet_type: DietType | null
   seasons: Season[] | null
+  /** null = not classified; true = usually served with a side dish. */
+  needs_side: boolean | null
+  side_suggestion: string | null
   description: string | null
   servings: number
   prep_time_minutes: number | null
@@ -154,6 +157,8 @@ export interface UpdateRecipePayload {
   category?: RecipeCategory | null
   diet_type?: DietType | null
   seasons?: Season[] | null
+  needs_side?: boolean | null
+  side_suggestion?: string | null
   description?: string | null
   instructions?: string[]
   servings?: number

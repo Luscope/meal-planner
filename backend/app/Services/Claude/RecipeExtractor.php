@@ -122,13 +122,13 @@ class RecipeExtractor
      * a full re-extraction.
      *
      * @param  list<string>  $ingredientNames
-     * @return array{category: RecipeCategory, seasons: list<Season>, base: RecipeBase, protein_source: ProteinSource}
+     * @return array{category: RecipeCategory, seasons: list<Season>, needs_side: bool, side_suggestion: string|null, base: RecipeBase, protein_source: ProteinSource}
      */
     public function classifyBaseAndProtein(string $title, array $ingredientNames): array
     {
         $response = $this->client->messages->create(
             model: 'claude-sonnet-5',
-            maxTokens: 256,
+            maxTokens: 512,
             messages: [
                 ['role' => 'user', 'content' => [
                     ['type' => 'text', 'text' => $this->buildBaseAndProteinPrompt($title, $ingredientNames)],
@@ -146,6 +146,9 @@ class RecipeExtractor
                 return [
                     'category' => RecipeCategory::from($data['category']),
                     'seasons' => array_map(fn ($value) => Season::from($value), $data['seasons']),
+                    'needs_side' => (bool) $data['needs_side'],
+                    // A hint without a need makes no sense, whatever the model returned.
+                    'side_suggestion' => $data['needs_side'] ? ($data['side_suggestion'] ?: null) : null,
                     'base' => RecipeBase::from($data['base']),
                     'protein_source' => ProteinSource::from($data['protein_source']),
                 ];
@@ -160,8 +163,9 @@ class RecipeExtractor
         $ingredients = implode(', ', $ingredientNames);
 
         return "Recipe title: {$title}\nIngredients: {$ingredients}\n\n"
-            .'Classify the course/category, the seasons it fits, the dominant base ingredient (carbohydrate component), and the '
-            .'dominant protein source of this dish, strictly from the literal title and ingredients list above.';
+            .'Classify the course/category, the seasons it fits, whether it needs a side dish, the dominant base ingredient '
+            .'(carbohydrate component), and the dominant protein source of this dish, strictly from the literal title and '
+            .'ingredients list above.';
     }
 
     private function baseAndProteinSchema(): array
@@ -175,6 +179,8 @@ class RecipeExtractor
                     'description' => 'The best-fitting course/category for this dish: appetizer (Vorspeise), main_course (Hauptspeise), side_dish (Beilage), dessert (Dessert), snack (Snack), or drink (Getränk).',
                 ],
                 'seasons' => $this->seasonsSchema(),
+                'needs_side' => $this->needsSideSchema(),
+                'side_suggestion' => $this->sideSuggestionSchema(),
                 'base' => [
                     'type' => 'string',
                     'enum' => array_column(RecipeBase::cases(), 'value'),
@@ -186,7 +192,7 @@ class RecipeExtractor
                     'description' => 'The dominant protein source: huhn_gefluegel (chicken/poultry), rind (beef), schwein (pork), fisch_meeresfruechte (fish/seafood), tofu_seitan, huelsenfruechte (legumes/lentils/beans as protein), ei (egg as main protein), milchprodukte_kaese (dairy/cheese as main protein), or kein_hauptprotein (no significant protein source, e.g. a plain side dish or dessert).',
                 ],
             ],
-            'required' => ['category', 'seasons', 'base', 'protein_source'],
+            'required' => ['category', 'seasons', 'needs_side', 'side_suggestion', 'base', 'protein_source'],
             'additionalProperties' => false,
         ];
     }
@@ -203,6 +209,28 @@ class RecipeExtractor
             'items' => ['type' => 'string', 'enum' => array_column(Season::cases(), 'value')],
             'minItems' => 1,
             'description' => 'The seasons in which this dish fits best, judged from its ingredients (fresh seasonal produce such as asparagus, strawberries, pumpkin or kale) and its character (hearty stews = autumn/winter, light salads = spring/summer). Include every season it suits. Use all four (spring, summer, autumn, winter) when it works year-round, e.g. dishes built on pantry staples like pasta, rice or legumes.',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function needsSideSchema(): array
+    {
+        return [
+            'type' => 'boolean',
+            'description' => 'true if this dish is normally NOT a complete meal on its own and is served with a side dish, e.g. braised or roasted meat, fish or poultry, schnitzel, chops, omelettes or plain vegetable/protein dishes without any starch (potatoes, rice, pasta, noodles, bread, dumplings, couscous, polenta) among the ingredients. false if it is complete by itself: one-pot dishes, soups and stews that contain a starch, pasta/rice/noodle dishes, bowls, casseroles, pizza, sandwiches. Always false for desserts, drinks, snacks, appetizers and for side dishes themselves.',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function sideSuggestionSchema(): array
+    {
+        return [
+            'type' => ['string', 'null'],
+            'description' => 'Only when needs_side is true: a short German pairing hint naming two or three fitting sides, e.g. "Kartoffelpüree, Reis oder Baguette" (max. 80 characters, no sentence, no full stop). null when needs_side is false.',
         ];
     }
 
@@ -332,6 +360,8 @@ class RecipeExtractor
                     'description' => 'The dominant protein source: huhn_gefluegel (chicken/poultry), rind (beef), schwein (pork), fisch_meeresfruechte (fish/seafood), tofu_seitan, huelsenfruechte (legumes/lentils/beans as protein), ei (egg as main protein), milchprodukte_kaese (dairy/cheese as main protein), or kein_hauptprotein (no significant protein source, e.g. a plain side dish or dessert).',
                 ],
                 'seasons' => $this->seasonsSchema(),
+                'needs_side' => $this->needsSideSchema(),
+                'side_suggestion' => $this->sideSuggestionSchema(),
                 'description' => ['type' => ['string', 'null']],
                 'servings' => ['type' => 'integer'],
                 'prep_time_minutes' => ['type' => ['integer', 'null']],
@@ -362,7 +392,7 @@ class RecipeExtractor
                     'minItems' => 1,
                 ],
             ],
-            'required' => ['title', 'category', 'diet_type', 'seasons', 'base', 'protein_source', 'servings', 'instructions', 'ingredients'],
+            'required' => ['title', 'category', 'diet_type', 'seasons', 'needs_side', 'side_suggestion', 'base', 'protein_source', 'servings', 'instructions', 'ingredients'],
             'additionalProperties' => false,
         ];
     }

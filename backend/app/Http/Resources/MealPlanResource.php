@@ -24,6 +24,8 @@ class MealPlanResource extends JsonResource
                 'id' => $this->recipe->id,
                 'title' => $this->recipe->title,
                 'cuisine' => $this->recipe->cuisine,
+                'needs_side' => $this->recipe->needs_side,
+                'side_suggestion' => $this->recipe->side_suggestion,
                 'servings' => $this->recipe->servings,
                 'calories_per_serving' => $this->recipe->calories_per_serving,
                 'protein_per_serving_g' => $this->recipe->protein_per_serving_g,

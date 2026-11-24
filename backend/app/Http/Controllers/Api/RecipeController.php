@@ -95,6 +95,8 @@ class RecipeController extends Controller
             'diet_type' => ['nullable', Rule::in(array_column(DietType::cases(), 'value'))],
             'seasons' => ['nullable', 'array'],
             'seasons.*' => ['distinct', Rule::in(array_column(Season::cases(), 'value'))],
+            'needs_side' => ['nullable', 'boolean'],
+            'side_suggestion' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'instructions' => ['sometimes', 'array', 'min:1'],
             'instructions.*' => ['string'],
@@ -117,6 +119,11 @@ class RecipeController extends Controller
             $validated['seasons'] = $validated['seasons'] === [] || $validated['seasons'] === null
                 ? null
                 : array_values($validated['seasons']);
+        }
+
+        // A pairing hint only makes sense for a recipe that needs a side.
+        if (array_key_exists('needs_side', $validated) && $validated['needs_side'] !== true) {
+            $validated['side_suggestion'] = null;
         }
 
         $recipe->update(Arr::except($validated, ['ingredients']));

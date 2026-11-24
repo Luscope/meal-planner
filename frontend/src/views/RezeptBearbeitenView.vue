@@ -28,6 +28,8 @@ const cuisine = ref('')
 const category = ref<RecipeCategory | ''>('')
 const dietType = ref<DietType | ''>('')
 const seasons = ref<Season[]>([])
+const needsSide = ref<'' | 'yes' | 'no'>('')
+const sideSuggestion = ref('')
 const description = ref('')
 const instructionsText = ref('')
 const servings = ref<number | null>(null)
@@ -98,6 +100,8 @@ onMounted(async () => {
     category.value = recipe.category ?? ''
     dietType.value = recipe.diet_type ?? ''
     seasons.value = recipe.seasons ?? []
+    needsSide.value = recipe.needs_side === null ? '' : recipe.needs_side ? 'yes' : 'no'
+    sideSuggestion.value = recipe.side_suggestion ?? ''
     description.value = recipe.description ?? ''
     instructionsText.value = recipe.instructions.join('\n')
     servings.value = recipe.servings
@@ -153,6 +157,8 @@ async function handleSubmit() {
       category: category.value || null,
       diet_type: dietType.value || null,
       seasons: seasons.value.length > 0 ? seasons.value : null,
+      needs_side: needsSide.value === '' ? null : needsSide.value === 'yes',
+      side_suggestion: needsSide.value === 'yes' ? sideSuggestion.value.trim() || null : null,
       description: description.value || null,
       instructions,
       servings: servings.value ?? undefined,
@@ -236,6 +242,25 @@ async function handleSubmit() {
           </button>
         </div>
       </fieldset>
+
+      <label>
+        Braucht eine Beilage?
+        <select v-model="needsSide">
+          <option value="">Keine Angabe</option>
+          <option value="yes">Ja, wird mit Beilage serviert</option>
+          <option value="no">Nein, ist allein ein vollständiges Essen</option>
+        </select>
+      </label>
+
+      <label v-if="needsSide === 'yes'">
+        Beilagen-Vorschlag (optional)
+        <input
+          v-model="sideSuggestion"
+          type="text"
+          maxlength="255"
+          placeholder="z. B. Kartoffelpüree, Reis oder Baguette"
+        />
+      </label>
 
       <label>
         Beschreibung (optional)

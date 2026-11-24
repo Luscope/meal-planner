@@ -83,6 +83,42 @@ test('rejects an invalid or duplicated season on update', function () {
     $this->patchJson("/api/recipes/{$recipe->id}", ['seasons' => ['summer', 'summer']])->assertStatus(422);
 });
 
+test('updates the side-dish hint', function () {
+    [$household] = actingAsHouseholdUser();
+    $recipe = Recipe::factory()->for($household)->create(['needs_side' => null, 'side_suggestion' => null]);
+
+    $this->patchJson("/api/recipes/{$recipe->id}", ['needs_side' => true, 'side_suggestion' => 'Reis oder Kartoffeln'])
+        ->assertOk()
+        ->assertJsonPath('data.needs_side', true)
+        ->assertJsonPath('data.side_suggestion', 'Reis oder Kartoffeln');
+
+    expect($recipe->fresh()->needs_side)->toBeTrue()
+        ->and($recipe->fresh()->side_suggestion)->toBe('Reis oder Kartoffeln');
+});
+
+test('clears the side suggestion when a recipe no longer needs a side', function () {
+    [$household] = actingAsHouseholdUser();
+    $recipe = Recipe::factory()->for($household)->create(['needs_side' => true, 'side_suggestion' => 'Reis']);
+
+    // Even if a stale suggestion is sent along, "doesn't need a side" wins.
+    $this->patchJson("/api/recipes/{$recipe->id}", ['needs_side' => false, 'side_suggestion' => 'Reis'])
+        ->assertOk()
+        ->assertJsonPath('data.needs_side', false)
+        ->assertJsonPath('data.side_suggestion', null);
+
+    $this->patchJson("/api/recipes/{$recipe->id}", ['needs_side' => null])
+        ->assertOk()
+        ->assertJsonPath('data.needs_side', null);
+});
+
+test('rejects an invalid side-dish hint on update', function () {
+    [$household] = actingAsHouseholdUser();
+    $recipe = Recipe::factory()->for($household)->create();
+
+    $this->patchJson("/api/recipes/{$recipe->id}", ['needs_side' => 'maybe'])->assertStatus(422);
+    $this->patchJson("/api/recipes/{$recipe->id}", ['needs_side' => true, 'side_suggestion' => str_repeat('x', 256)])->assertStatus(422);
+});
+
 test('rejects an invalid diet_type value on update', function () {
     [$household] = actingAsHouseholdUser();
     $recipe = Recipe::factory()->for($household)->create();

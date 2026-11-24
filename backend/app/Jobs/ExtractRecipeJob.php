@@ -74,6 +74,8 @@ class ExtractRecipeJob implements ShouldQueue
             'category' => $data['category'] ?? null,
             'diet_type' => $data['diet_type'] ?? null,
             'seasons' => $data['seasons'] ?? null,
+            'needs_side' => $data['needs_side'] ?? null,
+            'side_suggestion' => ($data['needs_side'] ?? false) ? (($data['side_suggestion'] ?? null) ?: null) : null,
             'base' => $data['base'] ?? null,
             'protein_source' => $data['protein_source'] ?? null,
             'description' => $data['description'] ?? null,
