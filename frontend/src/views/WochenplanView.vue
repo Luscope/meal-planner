@@ -162,6 +162,15 @@ async function handleRate(entry: MealPlan, rating: MealRating) {
   }
 }
 
+/**
+ * Hint that the recipe is usually served with a side — but only while the
+ * slot holds just this one recipe; once a second recipe (the side) is
+ * planned alongside it, the reminder would be noise.
+ */
+function showSideHint(entry: MealPlan, day: Date, mealType: MealType): boolean {
+  return entry.recipe.needs_side === true && entriesFor(day, mealType).length === 1
+}
+
 function isOverTarget(calories: number, target: number | null): boolean {
   return target !== null && calories > target
 }
@@ -249,6 +258,9 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
                 <div v-if="entry.family_members.length" class="chip-members">
                   {{ entry.family_members.map((member) => member.name).join(', ') }}
                 </div>
+                <div v-if="showSideHint(entry, day, mealType)" class="chip-side">
+                  + Beilage<template v-if="entry.recipe.side_suggestion">: {{ entry.recipe.side_suggestion }}</template>
+                </div>
                 <div class="chip-rating">
                   <button
                     type="button"
@@ -316,6 +328,9 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
             </div>
             <div v-if="entry.family_members.length" class="chip-members">
               {{ entry.family_members.map((member) => member.name).join(', ') }}
+            </div>
+            <div v-if="showSideHint(entry, day, mealType)" class="chip-side">
+              + Beilage<template v-if="entry.recipe.side_suggestion">: {{ entry.recipe.side_suggestion }}</template>
             </div>
             <div class="chip-rating">
               <button
@@ -639,6 +654,16 @@ function dayEntry(member: Summary['family_members'][number], day: Date) {
   min-width: 0;
   font-weight: 600;
   line-height: 1.3;
+}
+
+.chip-side {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-xs);
+  background: var(--color-warn-bg);
+  color: var(--color-warn-text);
+  align-self: flex-start;
 }
 
 .chip-meta,

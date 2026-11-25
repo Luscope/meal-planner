@@ -70,6 +70,14 @@ onMounted(async () => {
       </div>
       <p v-if="recipe.description" class="description">{{ recipe.description }}</p>
 
+      <aside v-if="recipe.needs_side" class="side-hint">
+        <AppIcon name="plus" :size="18" />
+        <span>
+          <strong>Beilage nicht vergessen.</strong>
+          <template v-if="recipe.side_suggestion"> Dazu passt: {{ recipe.side_suggestion }}</template>
+        </span>
+      </aside>
+
       <dl class="meta-grid">
         <div>
           <dt>Portionen</dt>
@@ -220,6 +228,24 @@ h1 {
   margin-top: 1rem;
   color: var(--color-muted);
   line-height: 1.6;
+}
+
+.side-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--color-warn-bg);
+  color: var(--color-warn-text);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.side-hint svg {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
 }
 
 .meta-grid {

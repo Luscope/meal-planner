@@ -17,6 +17,8 @@ function classification(array $overrides = []): array
     return array_merge([
         'category' => RecipeCategory::MainCourse,
         'seasons' => [Season::Autumn, Season::Winter],
+        'needs_side' => false,
+        'side_suggestion' => null,
         'base' => RecipeBase::Pasta,
         'protein_source' => ProteinSource::Rind,
     ], $overrides);
@@ -104,6 +106,8 @@ test('--force re-classifies and overwrites recipes that are already fully classi
     $this->mock(RecipeExtractor::class, function ($mock) {
         $mock->shouldReceive('classifyBaseAndProtein')->once()->andReturn(classification([
             'seasons' => [Season::Autumn, Season::Winter],
+        'needs_side' => false,
+        'side_suggestion' => null,
             'base' => RecipeBase::Huelsenfruechte,
             'protein_source' => ProteinSource::Huelsenfruechte,
         ]));
@@ -133,4 +137,58 @@ test('--household limits classification to that household', function () {
 
     expect($ownRecipe->fresh()->base)->toBe(RecipeBase::Pasta)
         ->and($otherRecipe->fresh()->base)->toBeNull();
+});
+
+test('fills the side-dish hint as a pair when needs_side is still empty', function () {
+    $household = Household::factory()->create();
+
+    $recipe = recipeWithIngredient($household, 'Schweinekoteletts mit Honig', 'Schweinekotelett', [
+        'category' => RecipeCategory::MainCourse->value,
+        'seasons' => ['autumn'],
+        'base' => RecipeBase::Sonstiges->value,
+        'protein_source' => ProteinSource::Schwein->value,
+        'needs_side' => null,
+        'side_suggestion' => null,
+    ]);
+
+    $this->mock(RecipeExtractor::class, function ($mock) {
+        $mock->shouldReceive('classifyBaseAndProtein')->once()->andReturn(classification([
+            'needs_side' => true,
+            'side_suggestion' => 'Kartoffelpüree, Reis oder Rotkohl',
+        ]));
+    });
+
+    $this->artisan('recipes:classify-base-protein')->assertSuccessful();
+
+    expect($recipe->fresh()->needs_side)->toBeTrue()
+        ->and($recipe->fresh()->side_suggestion)->toBe('Kartoffelpüree, Reis oder Rotkohl');
+});
+
+test('never overwrites an already-decided needs_side, and never adds a hint to a "needs no side" recipe', function () {
+    $household = Household::factory()->create();
+
+    // Hand-set to "needs no side" (so side_suggestion is legitimately null);
+    // seasons is still empty, which is why the recipe gets selected at all.
+    $recipe = recipeWithIngredient($household, 'Linseneintopf', 'Linsen', [
+        'category' => RecipeCategory::MainCourse->value,
+        'seasons' => null,
+        'base' => RecipeBase::Huelsenfruechte->value,
+        'protein_source' => ProteinSource::Huelsenfruechte->value,
+        'needs_side' => false,
+        'side_suggestion' => null,
+    ]);
+
+    $this->mock(RecipeExtractor::class, function ($mock) {
+        $mock->shouldReceive('classifyBaseAndProtein')->once()->andReturn(classification([
+            'needs_side' => true,
+            'side_suggestion' => 'Brot',
+        ]));
+    });
+
+    $this->artisan('recipes:classify-base-protein')->assertSuccessful();
+
+    $fresh = $recipe->fresh();
+    expect($fresh->seasons)->toBe(['autumn', 'winter'])
+        ->and($fresh->needs_side)->toBeFalse()
+        ->and($fresh->side_suggestion)->toBeNull();
 });

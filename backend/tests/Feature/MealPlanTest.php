@@ -43,6 +43,17 @@ test('creates a meal plan with assigned family members', function () {
     expect(MealPlan::first()->familyMembers)->toHaveCount(2);
 });
 
+test('meal plan entries expose the recipe\'s side-dish hint', function () {
+    [$household] = planningHousehold();
+    $recipe = Recipe::factory()->for($household)->create(['needs_side' => true, 'side_suggestion' => 'Kartoffelpüree oder Reis']);
+    $mealPlan = MealPlan::factory()->for($household)->for($recipe)->create(['date' => '2026-07-20']);
+
+    $this->getJson('/api/meal-plans?start_date=2026-07-20&end_date=2026-07-20')
+        ->assertOk()
+        ->assertJsonPath('data.0.recipe.needs_side', true)
+        ->assertJsonPath('data.0.recipe.side_suggestion', 'Kartoffelpüree oder Reis');
+});
+
 test('rejects a duplicate meal plan for the same day, meal type and recipe', function () {
     [$household] = planningHousehold();
     $recipe = Recipe::factory()->for($household)->create();

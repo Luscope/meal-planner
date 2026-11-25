@@ -29,6 +29,8 @@ export interface MealPlanRecipe {
   id: number
   title: string
   cuisine: string | null
+  needs_side: boolean | null
+  side_suggestion: string | null
   servings: number
   calories_per_serving: number | null
   protein_per_serving_g: string | null
